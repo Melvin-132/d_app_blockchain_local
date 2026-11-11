@@ -42,7 +42,7 @@ if (process.argv[2] === 'stop') {
         signal: AbortSignal.timeout(2000),
       });
       if (response.ok) {
-        console.log(`Clayde Chain is ready at port ${port}. Set this Codespaces port to Public to share it.`);
+        console.log(`Clayde Chain is ready at http://localhost:${port}. Set this Codespaces port to Public to share it.`);
         ready = true;
         break;
       }

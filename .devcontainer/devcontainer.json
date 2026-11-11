@@ -7,6 +7,7 @@
   "hostRequirements": {
     "cpus": 2
   },
+  "forwardPorts": [10000],
   "portsAttributes": {
     "10000": {
       "label": "Clayde Chain demo",
