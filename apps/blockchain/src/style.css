@@ -1,0 +1,4 @@
+.stat-hint { display: block; margin-top: 2px; color: #9aa5b7; font-size: 9px; }
+.data-grid .panel { min-width: 0; }
+.data-grid table { min-width: 510px; }
+.data-grid .panel-content { padding-right: 8px; padding-left: 8px; }

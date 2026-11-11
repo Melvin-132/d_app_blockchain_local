@@ -1,0 +1,78 @@
+name: clayde-local-platform
+
+x-validator: &validator
+  image: hyperledger/besu:26.10.0
+  restart: unless-stopped
+  command:
+    - --data-path=/data
+    - --genesis-file=/network/genesis.json
+    - --node-private-key-file=/keys/node.key
+    - --p2p-host=0.0.0.0
+    - --p2p-port=30303
+    - --discovery-mode=V4
+    - --bootnodes=${BESU_BOOTNODES:?Run npm run network:setup first}
+  networks: [clayde]
+
+services:
+  validator1:
+    <<: *validator
+    command:
+      - --data-path=/data
+      - --genesis-file=/network/genesis.json
+      - --node-private-key-file=/keys/node.key
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=127.0.0.1,localhost
+      - --p2p-host=0.0.0.0
+      - --p2p-port=30303
+      - --discovery-mode=V4
+      - --bootnodes=${BESU_BOOTNODES:?Run npm run network:setup first}
+    ports:
+      - "127.0.0.1:8545:8545"
+    volumes:
+      - ./.besu/data/validator1:/data
+      - ./.besu/generated/genesis.json:/network/genesis.json:ro
+      - ./.besu/generated/node-keys/validator1.key:/keys/node.key:ro
+    networks:
+      clayde:
+        ipv4_address: 172.31.0.11
+
+  validator2:
+    <<: *validator
+    volumes:
+      - ./.besu/data/validator2:/data
+      - ./.besu/generated/genesis.json:/network/genesis.json:ro
+      - ./.besu/generated/node-keys/validator2.key:/keys/node.key:ro
+    networks:
+      clayde:
+        ipv4_address: 172.31.0.12
+
+  validator3:
+    <<: *validator
+    volumes:
+      - ./.besu/data/validator3:/data
+      - ./.besu/generated/genesis.json:/network/genesis.json:ro
+      - ./.besu/generated/node-keys/validator3.key:/keys/node.key:ro
+    networks:
+      clayde:
+        ipv4_address: 172.31.0.13
+
+  validator4:
+    <<: *validator
+    volumes:
+      - ./.besu/data/validator4:/data
+      - ./.besu/generated/genesis.json:/network/genesis.json:ro
+      - ./.besu/generated/node-keys/validator4.key:/keys/node.key:ro
+    networks:
+      clayde:
+        ipv4_address: 172.31.0.14
+
+networks:
+  clayde:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

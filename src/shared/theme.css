@@ -1,0 +1,88 @@
+:root {
+  color: #171326;
+  background: #f5f4fa;
+  --navy: #171326;
+  --navy-2: #282044;
+  --blue: #4169e1;
+  --cyan: #a78bfa;
+  --muted: #77738b;
+  --line: #e7e4f0;
+  --green: #15976a;
+  --surface: #fff;
+  --shadow: 0 12px 30px rgba(27, 18, 54, .08);
+}
+
+body { color: #171326; background: #f5f4fa; }
+.sidebar, .wallet-sidebar, .explorer-header {
+  color: #f8f7ff;
+  background: linear-gradient(165deg, #21183a, #101018 85%);
+}
+.brand-mark {
+  color: #fff;
+  background: linear-gradient(140deg, #7655df, #4278ed);
+}
+.side-nav a:hover, .side-nav a.active, .wallet-nav button:hover, .wallet-nav button.active {
+  color: #fff;
+  background: linear-gradient(100deg, #5939ae, #315dbd);
+}
+.page-header h1, .wallet-topbar h1 { color: #171326; }
+.panel-heading {
+  background: linear-gradient(100deg, #30204e, #5141a4);
+}
+.panel-heading a, .panel-heading button { color: #e8e2ff; }
+.stat-icon.blue { color: #4667db; background: #e9edff; }
+.stat-icon.purple { color: #7651cc; background: #f0e9ff; }
+.primary-button {
+  background: linear-gradient(100deg, #6344c7, #4169e1);
+}
+.secondary-button { color: #49358f; background: #eeeaff; }
+.status-pill, .tag {
+  color: #55418e;
+  border-color: #e0d9fa;
+  background: #f3f0ff;
+}
+.explorer-page, .wallet-shell { color: #171326; background: #f5f4fa; }
+.explorer-brand > span:last-child > span { color: #a78bfa; }
+.explorer-brand small { color: #c3b9df; }
+.explorer-header nav { color: #d7d1e8; }
+.explorer-header nav a:hover, .explorer-header nav .active { color: #fff; }
+.explorer-hero {
+  background: radial-gradient(ellipse at 50% 20%, #49347b 0%, #21183a 50%, #101018 100%);
+}
+.hero-glow { background: #8b5cf666; }
+.explorer-kicker { color: #c4b5fd; }
+.explorer-hero h1 span { color: #a5b4fc; }
+.hero-copy { color: #ddd8ed; }
+.explorer-search { border-color: #ffffff30; }
+.explorer-tables .panel-heading { background: linear-gradient(100deg, #30204e, #5141a4); }
+.explorer-tables .panel-heading > span { color: #e8e2ff; }
+.link-button { color: #5b42b5; }
+.explorer-promo {
+  background: radial-gradient(circle at 15% 50%, #5945a5, #281b49 70%, #14111f);
+}
+.explorer-promo a { border-color: #a78bfa; }
+.wallet-brand { color: #f8f7ff; }
+.wallet-brand small, .wallet-network { color: #b7aecb; }
+.wallet-topbar h1 { color: #171326; }
+.eyebrow { color: #6344c7; }
+.balance-banner {
+  background: linear-gradient(115deg, #21183a 0%, #51399b 56%, #4169e1 100%);
+  box-shadow: 0 14px 32px #49347b33;
+}
+.coin-emblem {
+  border-color: #d6c9ff;
+  color: #fff;
+  background: linear-gradient(145deg, #9575ed, #5141a4);
+  text-shadow: none;
+}
+.send-action { background: linear-gradient(100deg, #6344c7, #4169e1); }
+.receive-action { background: linear-gradient(100deg, #39304f, #6653a0); }
+.tx-type.sent { color: #4a3b95; background: #efebff; }
+.tx-type.received { color: #128157; background: #e6f8ef; }
+.wallet-amount-input span { color: #5b42b5; }
+.receive-icon { color: #6045bd; background: #efebff; }
+.send-form input:focus { border-color: #8065d6; box-shadow: 0 0 0 3px #6849c31a; }
+
+@media (max-width: 720px) {
+  .wallet-sidebar { border-right: 0; }
+}

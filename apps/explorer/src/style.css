@@ -1,0 +1,49 @@
+.explorer-page { min-height: 100vh; background: #f3f6fc; }
+.explorer-header { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 clamp(16px, 5vw, 72px); color: #fff; background: #091c3c; }
+.explorer-brand { display: flex; align-items: center; gap: 10px; font: 800 16px Manrope, sans-serif; }
+.explorer-brand > span:last-child > span { color: #56b5ff; }
+.explorer-brand small { display: block; margin-top: 2px; color: #9cb4d8; font: 600 8px 'DM Sans', sans-serif; letter-spacing: 1px; }
+.explorer-header nav { display: flex; align-items: center; gap: 24px; color: #c3d2e9; font-size: 12px; }
+.explorer-header nav a:hover, .explorer-header nav .active { color: #fff; }
+.explorer-header .status-pill { color: #c7f5e1; background: #0c362f; border-color: #145648; }
+.explorer-hero { position: relative; overflow: hidden; padding: 54px 18px 39px; color: #fff; text-align: center; background: radial-gradient(ellipse at 50% 20%, #17478f 0%, #0c2b61 47%, #091d3d 100%); }
+.hero-glow { position: absolute; width: 460px; height: 260px; top: -160px; left: calc(50% - 230px); border-radius: 50%; background: #20b3ff66; filter: blur(60px); pointer-events: none; }
+.explorer-kicker { position: relative; display: flex; justify-content: center; align-items: center; gap: 8px; margin: 0 0 14px; color: #83caff; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; }
+.explorer-hero h1 { position: relative; margin: 0; font: 800 clamp(28px, 5vw, 44px) Manrope, sans-serif; letter-spacing: -1.5px; line-height: 1.12; }
+.explorer-hero h1 span { color: #67beff; }
+.hero-copy { position: relative; margin: 14px 0 23px; color: #c1d5f3; font-size: 13px; }
+.explorer-search { position: relative; border-color: #ffffff2a; box-shadow: 0 8px 26px #06163266; text-align: left; }
+.explorer-search > svg { align-self: center; margin-left: 9px; color: #7291bc; }
+.explorer-search .primary-button { min-width: 120px; }
+.search-error { color: #ffd1d6; font-size: 12px; }
+.explorer-content { max-width: 1360px; margin: 0 auto; padding: 24px clamp(14px, 3vw, 38px) 28px; }
+.explorer-tables .panel { min-width: 0; }
+.explorer-tables .panel-content { padding: 0 8px 8px; }
+.explorer-tables table { min-width: 490px; }
+.history-index-table table { min-width: 780px; }
+.history-index-table .history-more { margin-bottom: 8px; }
+.explorer-tables .panel-heading h2 { display: flex; align-items: center; gap: 8px; }
+.explorer-tables .panel-heading > span { color: #d3e6ff; font-size: 10px; }
+.explorer-tables .panel-heading { background: linear-gradient(100deg, #0d2f66, #1555a8); }
+.link-button { padding: 0; border: 0; color: #1768cc; background: transparent; font-size: inherit; }
+.link-button:hover { text-decoration: underline; }
+.explorer-promo { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 19px; padding: 20px 24px; border-radius: 13px; color: #fff; background: radial-gradient(circle at 15% 50%, #1c6fc3, #0b2d68 68%, #091f48); }
+.explorer-promo strong { font: 800 18px Manrope, sans-serif; }
+.explorer-promo p { margin: 5px 0 0; color: #c4d8f4; font-size: 11px; }
+.explorer-promo a { display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 1px solid #6fb6ff; border-radius: 8px; color: #fff; font-size: 11px; }
+.search-result { margin-bottom: 18px; }
+.search-result .panel-heading button { padding: 5px 8px; border: 1px solid #ffffff44; border-radius: 6px; }
+.search-result dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 0; margin: 0; padding: 10px 16px; }
+.search-result dl > div { display: contents; }
+.search-result dt, .search-result dd { margin: 0; padding: 9px 0; border-bottom: 1px solid #edf1f7; font-size: 11px; }
+.search-result dt { color: #75839b; }
+.search-result dd { overflow-wrap: anywhere; color: #283a59; }
+@media (max-width: 700px) {
+  .explorer-header { height: auto; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
+  .explorer-header nav { order: 3; width: 100%; justify-content: space-between; gap: 10px; }
+  .explorer-header .status-pill { margin-left: auto; }
+  .explorer-hero { padding-top: 39px; }
+  .explorer-search { flex-wrap: wrap; }
+  .explorer-search input { flex-basis: calc(100% - 42px); }
+  .explorer-search .primary-button { width: 100%; }
+}

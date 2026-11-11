@@ -1,0 +1,29 @@
+{
+  "name": "clayde-chain-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0 <27"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "node --test scripts/history-index.test.mjs scripts/render-deploy.test.mjs",
+    "wallet:create": "node scripts/wallet-create.mjs",
+    "network:setup": "node network/besu/setup.js",
+    "network:up": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml up -d",
+    "network:down": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml stop",
+    "build": "npm run build:blockchain && npm run build:explorer && npm run build:dapp",
+    "build:blockchain": "vite build apps/blockchain --config apps/blockchain/vite.config.js",
+    "build:explorer": "vite build apps/explorer --config apps/explorer/vite.config.js",
+    "build:dapp": "vite build apps/dapp --config apps/dapp/vite.config.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "ethers": "^6.17.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.7.0",
+    "vite": "^8.3.4"
+  }
+}

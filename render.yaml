@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: clayde-chain-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: BESU_GENESIS_ADDRESS
+        sync: false
