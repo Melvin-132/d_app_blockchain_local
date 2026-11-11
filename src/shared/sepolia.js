@@ -22,6 +22,7 @@ const provider = new JsonRpcProvider(
 );
 const WALLET_STORAGE_KEY = 'clayde.wallet.keystore';
 const eventCache = { through: -1, logs: [] };
+const RPC_HEAD_SAFETY_BLOCKS = 2;
 const deploymentBlock = Number(import.meta.env.VITE_CYD_DEPLOYMENT_BLOCK || deployment.blockNumber);
 const siteBase = import.meta.env.BASE_URL.replace(/(?:blockchain|explorer|dapp)\/$/, '');
 const pageUrl = (page, port) => import.meta.env.DEV
@@ -151,7 +152,10 @@ async function loadTransferLogs(fromBlock, toBlock) {
 }
 
 async function allTransferLogs() {
-  const latestBlock = await provider.getBlockNumber();
+  const latestBlock = Math.max(
+    0,
+    await provider.getBlockNumber() - RPC_HEAD_SAFETY_BLOCKS,
+  );
   if (eventCache.through < deploymentBlock) {
     eventCache.logs = await loadTransferLogs(deploymentBlock, latestBlock);
   } else if (latestBlock > eventCache.through) {
@@ -204,7 +208,10 @@ export async function getChainSnapshot(blockLimit = 20) {
     Array.from({ length: latestBlock - start + 1 }, (_, index) => provider.getBlock(start + index, true)),
   );
   const logs = hasDeploymentConfiguration()
-    ? await loadTransferLogs(Math.max(start, deploymentBlock), latestBlock)
+    ? await loadTransferLogs(
+      Math.max(start, deploymentBlock),
+      Math.max(0, latestBlock - RPC_HEAD_SAFETY_BLOCKS),
+    )
     : [];
   const transfers = await normalizeLogs(logs);
   const transferCounts = new Map();
