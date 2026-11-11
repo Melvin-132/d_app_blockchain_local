@@ -119,43 +119,40 @@ npm run build
 Les builds sont dans `apps/blockchain/dist`, `apps/explorer/dist` et `apps/dapp/dist`.
 Cette étape n’est pas nécessaire pour lancer les interfaces localement.
 
-## Démonstration hébergée via GitHub et Northflank
+## Démo temporaire en ligne avec GitHub Codespaces
 
-Le dépôt GitHub reste la source du code. Northflank peut construire directement son
-`Dockerfile` à chaque mise à jour du dépôt. Le conteneur sert les trois interfaces,
-l’API d’historique et un validateur QBFT sur le même domaine. Le RPC Besu reste limité
-aux méthodes autorisées par le serveur.
+GitHub Codespaces permet de lancer cette démo depuis le dépôt GitHub, sans fournir
+de carte tant que l’utilisation incluse du compte personnel n’est pas dépassée.
+L’application complète tourne dans un conteneur : les trois interfaces, Besu et
+l’historique. Elle est partageable par un lien public tant que le Codespace fonctionne.
+Ce n’est pas un hébergement permanent : le Codespace s’arrête après inactivité, a une
+durée maximale de 12 heures par session et consomme le quota mensuel GitHub Codespaces
+(pour un compte GitHub Free personnel, actuellement 120 heures de calcul et 15 Go-mois
+de stockage). GitHub bloque l’utilisation lorsque ce quota est épuisé si aucun moyen
+de paiement n’est enregistré.
 
-La page de tarification Northflank annonce jusqu’à 20 $ US de ressources gratuites
-par mois. Une instance de 0,5 vCPU et 1 Go de mémoire est estimée à environ 12 $ US
-par mois au tarif affiché; cette estimation n’inclut pas d’éventuels frais de trafic et
-les conditions peuvent changer. Vérifiez le crédit gratuit affiché dans votre compte
-avant de lancer le service. Ne saisissez pas de moyen de paiement si la plateforme
-l’exige ou si le coût estimé dépasse le crédit gratuit.
+1. Sur GitHub, ouvre `Melvin-132/d_app_blockchain_local`, puis **Code > Codespaces >
+   Create codespace on main**. Attends la préparation de l’environnement.
+2. Dans le terminal intégré du Codespace, lance une seule commande :
 
-Pour le publier :
+   ```bash
+   npm run demo:cloud
+   ```
 
-1. Connectez-vous à [Northflank](https://app.northflank.com/signup) avec GitHub et
-   autorisez l’accès au dépôt `Melvin-132/d_app_blockchain_local`.
-2. Créez un projet, puis un service depuis le dépôt GitHub, branche `main`. Choisissez
-   la construction Docker avec `Dockerfile` à la racine du dépôt et activez les
-   déploiements automatiques sur les nouveaux commits.
-3. Configurez une seule instance de **0,5 vCPU / 1 Go**, sans volume persistant. Publiez
-   le port HTTP **10000** et définissez le contrôle de santé sur **`/health`**.
-4. Ajoutez la variable `BESU_GENESIS_ADDRESS` avec l’adresse publique du portefeuille
-   du propriétaire (visible dans la DApp locale). Ne mettez ni clé privée ni fichier
-   keystore dans les variables ou le dépôt.
-5. Si l’état du service indique qu’il utilise uniquement le crédit gratuit et que le
-   déploiement réussit, ouvrez les pages sur le même domaine :
-   `/blockchain/`, `/explorer/` et `/dapp/`.
-6. Dans la DApp hébergée, importez le portefeuille chiffré du propriétaire pour
-   utiliser les CYD préfinancés au Genesis. Aucun faucet n’est activé; les autres
-   portefeuilles doivent recevoir des CYD du propriétaire avant d’envoyer.
+   Elle construit et démarre la démo, puis vérifie `/health`. La construction initiale
+   peut prendre quelques minutes.
+3. Dans l’onglet **Ports**, repère le port **10000**. Si nécessaire, change sa
+   visibilité à **Public**, puis ouvre l’adresse transférée.
+4. Les trois pages sont sous le même domaine : `/blockchain/`, `/explorer/` et
+   `/dapp/`. Dans la DApp, importe le portefeuille chiffré du propriétaire pour
+   utiliser les CYD préfinancés au Genesis.
+5. Pour arrêter Besu, exécute `npm run demo:cloud:stop`, puis arrête le Codespace
+   depuis GitHub afin de ne pas consommer inutilement les heures gratuites.
 
-La chaîne est éphémère : si le conteneur redémarre ou est redéployé, Besu repart de
-Genesis, les blocs et transactions précédents disparaissent et les soldes reviennent à
-leur valeur initiale. Ne transférez jamais d’actifs réels sur ce réseau de démonstration.
-Les offres gratuites et leurs quotas ne garantissent pas une disponibilité permanente.
+Les redémarrages réinitialisent la chaîne : blocs, transactions et soldes retournent
+aux valeurs du Genesis. Ne transfère aucun actif réel sur ce réseau de démonstration.
+Les quotas et les règles GitHub peuvent changer; vérifie l’usage inclus dans
+**Settings > Billing**. Ne configure pas de moyen de paiement pour cette démo.
 
 ## Arborescence
 
@@ -167,8 +164,9 @@ apps/
 network/besu/   # Genesis et réseau Besu QBFT
 scripts/dev.mjs # démarrage local des validateurs et des 3 interfaces
 scripts/render-server.mjs # serveur éphémère Besu/RPC/API pour le conteneur hébergé
+scripts/codespaces-demo.mjs # démarrage et vérification de la démo dans Codespaces
 Dockerfile      # image de démonstration hébergée
-render.yaml     # configuration Blueprint Render (ancienne option)
+render.yaml     # ancienne configuration Blueprint Render
 src/shared/     # paramètres réseau et accès RPC communs
 .besu/          # données, clés et portefeuille chiffré; ignoré par Git
 backups/        # sauvegardes locales de chaînes précédentes; ignoré par Git

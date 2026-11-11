@@ -13,6 +13,8 @@
     "network:setup": "node network/besu/setup.js",
     "network:up": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml up -d",
     "network:down": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml stop",
+    "demo:cloud": "node scripts/codespaces-demo.mjs",
+    "demo:cloud:stop": "docker stop clayde-codespaces-demo",
     "build": "npm run build:blockchain && npm run build:explorer && npm run build:dapp",
     "build:blockchain": "vite build apps/blockchain --config apps/blockchain/vite.config.js",
     "build:explorer": "vite build apps/explorer --config apps/explorer/vite.config.js",

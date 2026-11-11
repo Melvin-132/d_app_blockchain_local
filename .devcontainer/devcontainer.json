@@ -1,0 +1,18 @@
+{
+  "name": "Clayde Chain demo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 2
+  },
+  "portsAttributes": {
+    "10000": {
+      "label": "Clayde Chain demo",
+      "onAutoForward": "notify",
+      "visibility": "public"
+    }
+  },
+  "postCreateCommand": "npm ci"
+}
