@@ -244,7 +244,7 @@ async function serveStatic(request, response, pathname) {
 async function startBesu() {
   const fundedAddress = process.env.BESU_GENESIS_ADDRESS;
   if (!fundedAddress || !isAddress(fundedAddress)) {
-    throw new Error('Configurez BESU_GENESIS_ADDRESS avec une adresse publique valide dans Render.');
+    throw new Error('Configurez BESU_GENESIS_ADDRESS avec une adresse publique valide dans les variables du service.');
   }
   const fundedAccount = getAddress(fundedAddress);
   const validator = Wallet.createRandom();

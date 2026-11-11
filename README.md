@@ -119,38 +119,43 @@ npm run build
 Les builds sont dans `apps/blockchain/dist`, `apps/explorer/dist` et `apps/dapp/dist`.
 Cette étape n’est pas nécessaire pour lancer les interfaces localement.
 
-## Démonstration hébergée gratuite (Render Free)
+## Démonstration hébergée via GitHub et Northflank
 
-Le projet inclut un déploiement Render à un seul service Docker : les trois interfaces,
-l’API d’historique et un validateur QBFT sont servis sous un domaine `onrender.com`.
-Le RPC Besu reste derrière l’API du service; seules les méthodes JSON-RPC de lecture
-et l’envoi de transactions signées sont relayés.
+Le dépôt GitHub reste la source du code. Northflank peut construire directement son
+`Dockerfile` à chaque mise à jour du dépôt. Le conteneur sert les trois interfaces,
+l’API d’historique et un validateur QBFT sur le même domaine. Le RPC Besu reste limité
+aux méthodes autorisées par le serveur.
 
-Ce mode est volontairement éphémère. Render Free met le service en veille après
-15 minutes sans trafic et son système de fichiers est perdu au redémarrage, au
-redéploiement et au réveil. Besu repart alors de Genesis : les blocs et transactions
-de la session précédente disparaissent et les soldes reviennent à leur valeur initiale.
-Le réveil peut prendre environ une minute. Ne transférez jamais d’actifs réels sur ce
-réseau de démonstration.
+La page de tarification Northflank annonce jusqu’à 20 $ US de ressources gratuites
+par mois. Une instance de 0,5 vCPU et 1 Go de mémoire est estimée à environ 12 $ US
+par mois au tarif affiché; cette estimation n’inclut pas d’éventuels frais de trafic et
+les conditions peuvent changer. Vérifiez le crédit gratuit affiché dans votre compte
+avant de lancer le service. Ne saisissez pas de moyen de paiement si la plateforme
+l’exige ou si le coût estimé dépasse le crédit gratuit.
 
 Pour le publier :
 
-1. Créez un dépôt GitHub privé gratuit et ajoutez-y ce dossier de projet.
-2. Créez un compte Render gratuit, connectez le dépôt, puis choisissez **New > Blueprint**
-   et sélectionnez son fichier `render.yaml`.
-3. Lorsque Render le demande, renseignez `BESU_GENESIS_ADDRESS` avec l’adresse
-   publique du portefeuille du propriétaire (visible dans la DApp locale). Ne mettez
-   ni clé privée ni fichier keystore dans les variables ou le dépôt.
-4. Attendez la construction et le démarrage. Les trois pages sont sur le même domaine :
+1. Connectez-vous à [Northflank](https://app.northflank.com/signup) avec GitHub et
+   autorisez l’accès au dépôt `Melvin-132/d_app_blockchain_local`.
+2. Créez un projet, puis un service depuis le dépôt GitHub, branche `main`. Choisissez
+   la construction Docker avec `Dockerfile` à la racine du dépôt et activez les
+   déploiements automatiques sur les nouveaux commits.
+3. Configurez une seule instance de **0,5 vCPU / 1 Go**, sans volume persistant. Publiez
+   le port HTTP **10000** et définissez le contrôle de santé sur **`/health`**.
+4. Ajoutez la variable `BESU_GENESIS_ADDRESS` avec l’adresse publique du portefeuille
+   du propriétaire (visible dans la DApp locale). Ne mettez ni clé privée ni fichier
+   keystore dans les variables ou le dépôt.
+5. Si l’état du service indique qu’il utilise uniquement le crédit gratuit et que le
+   déploiement réussit, ouvrez les pages sur le même domaine :
    `/blockchain/`, `/explorer/` et `/dapp/`.
-5. Dans la DApp hébergée, importez le portefeuille chiffré du propriétaire pour
-   utiliser les CYD préfinancés au Genesis. Aucun faucet n’est activé : les autres
+6. Dans la DApp hébergée, importez le portefeuille chiffré du propriétaire pour
+   utiliser les CYD préfinancés au Genesis. Aucun faucet n’est activé; les autres
    portefeuilles doivent recevoir des CYD du propriétaire avant d’envoyer.
 
-Le plan gratuit a des quotas et peut suspendre le service lorsqu’ils sont épuisés.
-Si Render demande un moyen de paiement pendant l’inscription, ne renseignez pas de
-carte : arrêtez-vous et l’application restera disponible localement. Le service gratuit
-est adapté à une présentation, pas à une disponibilité garantie.
+La chaîne est éphémère : si le conteneur redémarre ou est redéployé, Besu repart de
+Genesis, les blocs et transactions précédents disparaissent et les soldes reviennent à
+leur valeur initiale. Ne transférez jamais d’actifs réels sur ce réseau de démonstration.
+Les offres gratuites et leurs quotas ne garantissent pas une disponibilité permanente.
 
 ## Arborescence
 
@@ -161,9 +166,9 @@ apps/
   dapp/         # portefeuille local chiffré
 network/besu/   # Genesis et réseau Besu QBFT
 scripts/dev.mjs # démarrage local des validateurs et des 3 interfaces
-scripts/render-server.mjs # serveur éphémère Besu/RPC/API pour Render Free
+scripts/render-server.mjs # serveur éphémère Besu/RPC/API pour le conteneur hébergé
 Dockerfile      # image de démonstration hébergée
-render.yaml     # configuration Blueprint Render Free
+render.yaml     # configuration Blueprint Render (ancienne option)
 src/shared/     # paramètres réseau et accès RPC communs
 .besu/          # données, clés et portefeuille chiffré; ignoré par Git
 backups/        # sauvegardes locales de chaînes précédentes; ignoré par Git
