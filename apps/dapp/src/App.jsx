@@ -21,6 +21,7 @@ function App() {
   const [balance, setBalance] = useState('');
   const [history, setHistory] = useState([]);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyError, setHistoryError] = useState('');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [fee, setFee] = useState('');
@@ -36,17 +37,26 @@ function App() {
 
   const refresh = useCallback(async (address = account) => {
     if (!address) return;
-    const [tokenBalance, transactions] = await Promise.all([
+    const [balanceResult, historyResult] = await Promise.allSettled([
       getCydBalance(address),
       getIndexedHistory({ scope: 'wallet', address, limit: 50 }),
     ]);
-    setBalance(formatCydUnits(tokenBalance, 4));
-    setHistory((current) => [
-      ...transactions.records,
-      ...current.slice(50).filter((record) =>
-        !transactions.records.some(({ hash, logIndex }) => hash === record.hash && logIndex === record.logIndex)),
-    ]);
-    setHistoryTotal(transactions.total);
+    if (balanceResult.status === 'rejected') throw balanceResult.reason;
+    setBalance(formatCydUnits(balanceResult.value, 4));
+    if (historyResult.status === 'fulfilled') {
+      setHistoryError('');
+      setHistory((current) => [
+        ...historyResult.value.records,
+        ...current.slice(50).filter((record) =>
+          !historyResult.value.records.some(({ hash, logIndex }) => hash === record.hash && logIndex === record.logIndex)),
+      ]);
+      setHistoryTotal(historyResult.value.total);
+      return;
+    }
+
+    setHistoryError(
+      `Portefeuille connecté et solde actualisé. Historique temporairement indisponible : ${historyResult.reason?.message || 'indexeur Sepolia indisponible.'}`,
+    );
   }, [account]);
 
   useEffect(() => {
@@ -98,6 +108,7 @@ function App() {
         setBalance('0');
         setHistory([]);
         setHistoryTotal(0);
+        setHistoryError('');
         setNotice(`${successMessage} Le contrat CYD reste à déployer sur Sepolia.`);
       }
     } catch (walletError) {
@@ -218,7 +229,7 @@ function App() {
   async function loadMoreHistory() {
     if (!account || historyLoading) return;
     setHistoryLoading(true);
-    setError('');
+    setHistoryError('');
     try {
       const result = await getIndexedHistory({
         scope: 'wallet',
@@ -232,7 +243,7 @@ function App() {
       });
       setHistoryTotal(result.total);
     } catch (historyError) {
-      setError(historyError.message || 'Impossible de charger l’historique CYD.');
+      setHistoryError(`Historique temporairement indisponible : ${historyError.message || 'indexeur Sepolia indisponible.'}`);
     } finally {
       setHistoryLoading(false);
     }
@@ -296,8 +307,9 @@ function App() {
 
         <section className="panel history-panel">
           <div className="history-heading"><h2>Historique CYD de cette adresse</h2><span>{history.length} / {historyTotal}</span></div>
+          {historyError && <div className="history-warning" role="status">{historyError}</div>}
           {!wallet && <div className="empty-state">Ouvrez le portefeuille pour filtrer les transferts de cette adresse.</div>}
-          {wallet && history.length === 0 && <div className="empty-state">Aucun transfert CYD trouvé pour cette adresse.</div>}
+          {wallet && history.length === 0 && !historyError && <div className="empty-state">Aucun transfert CYD trouvé pour cette adresse.</div>}
           {history.length > 0 && <div className="table-wrap"><table><thead><tr><th>Date</th><th>De</th><th>Vers</th><th>Montant</th><th>Transaction</th></tr></thead><tbody>
             {history.map((item) => <tr key={`${item.hash}-${item.logIndex}`}>
               <td>{new Date(item.timestamp * 1000).toLocaleString('fr-FR')}</td>

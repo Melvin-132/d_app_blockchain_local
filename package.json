@@ -11,7 +11,7 @@
     "dev:sepolia": "node scripts/dev-sepolia.mjs",
     "token:deploy": "node scripts/deploy-cyd.mjs",
     "build:vercel": "node scripts/build-vercel.mjs",
-    "test": "node --test scripts/history-index.test.mjs scripts/render-deploy.test.mjs",
+    "test": "node --test scripts/blockscout-index.test.mjs scripts/history-index.test.mjs scripts/render-deploy.test.mjs",
     "wallet:create": "node scripts/wallet-create.mjs",
     "network:setup": "node network/besu/setup.js",
     "network:up": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml up -d",

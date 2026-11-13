@@ -8,6 +8,7 @@ import {
   id,
   parseUnits,
 } from 'ethers';
+import { fetchContractTransferLogs } from './blockscout.js';
 import deployment from '../../contracts/sepolia-deployment.json';
 
 const transferInterface = new Interface([
@@ -21,7 +22,8 @@ const provider = new JsonRpcProvider(
   { staticNetwork: true },
 );
 const WALLET_STORAGE_KEY = 'clayde.wallet.keystore';
-const eventCache = { through: -1, logs: [] };
+const eventCache = { logs: null, refreshedAt: 0, pending: null };
+const HISTORY_CACHE_TTL_MS = 15_000;
 const RPC_HEAD_SAFETY_BLOCKS = 2;
 const deploymentBlock = Number(import.meta.env.VITE_CYD_DEPLOYMENT_BLOCK || deployment.blockNumber);
 const siteBase = import.meta.env.BASE_URL.replace(/(?:blockchain|explorer|dapp)\/$/, '');
@@ -156,12 +158,19 @@ async function allTransferLogs() {
     0,
     await provider.getBlockNumber() - RPC_HEAD_SAFETY_BLOCKS,
   );
-  if (eventCache.through < deploymentBlock) {
-    eventCache.logs = await loadTransferLogs(deploymentBlock, latestBlock);
-  } else if (latestBlock > eventCache.through) {
-    eventCache.logs.push(...await loadTransferLogs(eventCache.through + 1, latestBlock));
+  if (!eventCache.logs || Date.now() - eventCache.refreshedAt >= HISTORY_CACHE_TTL_MS) {
+    if (!eventCache.pending) {
+      eventCache.pending = fetchContractTransferLogs(getTokenAddress(), transferTopic)
+        .then((logs) => {
+          eventCache.logs = logs.filter((log) => log.blockNumber >= deploymentBlock);
+          eventCache.refreshedAt = Date.now();
+        })
+        .finally(() => {
+          eventCache.pending = null;
+        });
+    }
+    await eventCache.pending;
   }
-  eventCache.through = latestBlock;
   return { latestBlock, logs: eventCache.logs };
 }
 
@@ -169,15 +178,15 @@ async function normalizeLogs(logs) {
   const blocks = new Map();
   const records = await Promise.all(logs.map(async (log) => {
     const parsed = transferInterface.parseLog(log);
-    if (!blocks.has(log.blockNumber)) {
+    if (log.timestamp === undefined && !blocks.has(log.blockNumber)) {
       blocks.set(log.blockNumber, provider.getBlock(log.blockNumber));
     }
-    const block = await blocks.get(log.blockNumber);
+    const block = log.timestamp === undefined ? await blocks.get(log.blockNumber) : null;
     return {
       hash: log.transactionHash,
       blockNumber: log.blockNumber,
       logIndex: log.index,
-      timestamp: block?.timestamp ?? 0,
+      timestamp: log.timestamp ?? block?.timestamp ?? 0,
       from: getAddress(parsed.args.from),
       to: getAddress(parsed.args.to),
       amount: formatUnits(parsed.args.value, 18),

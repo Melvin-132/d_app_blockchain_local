@@ -63,6 +63,7 @@
 .fee-summary small { grid-column: 1 / -1; color: #778096; line-height: 1.5; }
 .fee-error { color: #ad364e; line-height: 1.5; }
 .history-sync { padding: 10px 16px; color: #55418e; background: #f3f0ff; font-size: 11px; }
+.history-warning { padding: 10px 16px; color: #805b0b; background: #fff7df; font-size: 11px; line-height: 1.5; }
 .history-more { display: block; margin: 12px auto 16px; padding: 9px 14px; border: 1px solid #ddd6f4; border-radius: 8px; color: #49358f; background: #f4f1ff; font-size: 11px; font-weight: 700; }
 .history-more:disabled { opacity: .6; cursor: wait; }
 .send-form .primary-button { margin-top: 6px; padding: 13px; }
