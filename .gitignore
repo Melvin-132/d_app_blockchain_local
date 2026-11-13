@@ -1,6 +1,7 @@
 node_modules/
 dist/
 apps/*/dist/
+/public/
 .besu/
 /backups/
 .env
