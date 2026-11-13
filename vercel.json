@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/", "destination": "/dapp/" },
+    { "source": "/blockchain", "destination": "/blockchain/" },
+    { "source": "/explorer", "destination": "/explorer/" },
+    { "source": "/dapp", "destination": "/dapp/" }
+  ]
+}
