@@ -2,3 +2,23 @@
 .data-grid .panel { min-width: 0; }
 .data-grid table { min-width: 510px; }
 .data-grid .panel-content { padding-right: 8px; padding-left: 8px; }
+.app-shell .sidebar { background: linear-gradient(175deg, #16314f 0%, #0c1d31 100%); }
+.app-shell .brand-mark { background: linear-gradient(140deg, #2d8be5, #4568d9); }
+.app-shell .side-nav a:hover, .app-shell .side-nav a.active { background: #1d63ab; }
+.app-shell .panel-heading { background: linear-gradient(100deg, #174a78, #1d68ad); }
+.app-shell .primary-button { background: linear-gradient(100deg, #1c6fc2, #278de5); }
+.standalone-page { width: min(100%, 980px); margin: 0 auto; }
+.dashboard-settings-content, .dashboard-about-content { padding-top: 7px; }
+.dashboard-settings-list { display: grid; gap: 0; margin: 0; }
+.dashboard-settings-list > div { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(0, 1.3fr); gap: 12px; padding: 11px 0; border-bottom: 1px solid #edf1f7; font-size: 11px; }
+.dashboard-settings-list dt { color: var(--muted); }
+.dashboard-settings-list dd { margin: 0; color: #31415d; font-weight: 600; overflow-wrap: anywhere; }
+.dashboard-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.dashboard-settings-actions button { display: inline-flex; align-items: center; gap: 7px; }
+.dashboard-settings-feedback { min-height: 14px; margin: 8px 0 0; color: #15815e; font-size: 11px; }
+.dashboard-about-content { color: #53627a; font-size: 12px; line-height: 1.6; }
+.dashboard-about-content p { margin: 8px 0; }
+.dashboard-demo-note { padding: 10px 12px; border-radius: 8px; background: #fff7e8; color: #805c1c; }
+@media (max-width: 460px) {
+  .dashboard-settings-list > div { grid-template-columns: 1fr; gap: 4px; }
+}

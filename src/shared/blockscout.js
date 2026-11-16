@@ -8,7 +8,7 @@ export async function fetchContractTransferLogs(address, transferTopic, fetchImp
   while (url) {
     const pageUrl = url.toString();
     if (visitedPages.has(pageUrl)) {
-      throw new Error('L’indexeur Sepolia a renvoyé un curseur de pagination répétitif.');
+      throw new Error('L’indexeur a renvoyé un curseur de pagination répétitif.');
     }
     visitedPages.add(pageUrl);
 
@@ -16,12 +16,12 @@ export async function fetchContractTransferLogs(address, transferTopic, fetchImp
       headers: { Accept: 'application/json' },
     });
     if (!response.ok) {
-      throw new Error(`L’indexeur Sepolia a répondu avec le statut HTTP ${response.status}.`);
+      throw new Error(`L’indexeur a répondu avec le statut HTTP ${response.status}.`);
     }
 
     const page = await response.json();
     if (!Array.isArray(page.items)) {
-      throw new Error('La réponse de l’indexeur Sepolia ne contient pas une liste de journaux valide.');
+      throw new Error('La réponse de l’indexeur ne contient pas une liste de journaux valide.');
     }
 
     for (const item of page.items) {
@@ -30,7 +30,7 @@ export async function fetchContractTransferLogs(address, transferTopic, fetchImp
       if (!Number.isSafeInteger(item.block_number) || !Number.isSafeInteger(item.index)
         || !Number.isFinite(timestamp) || !item.transaction_hash || !item.data
         || !Array.isArray(item.topics)) {
-        throw new Error('L’indexeur Sepolia a renvoyé un journal de transfert incomplet.');
+        throw new Error('L’indexeur a renvoyé un journal de transfert incomplet.');
       }
       logs.push({
         blockNumber: item.block_number,
@@ -47,7 +47,7 @@ export async function fetchContractTransferLogs(address, transferTopic, fetchImp
       continue;
     }
     if (typeof page.next_page_params !== 'object' || Array.isArray(page.next_page_params)) {
-      throw new Error('L’indexeur Sepolia a renvoyé un curseur de pagination invalide.');
+      throw new Error('L’indexeur a renvoyé un curseur de pagination invalide.');
     }
     url = new URL(pageUrl);
     for (const [key, value] of Object.entries(page.next_page_params)) {

@@ -12,28 +12,34 @@ function App() {
   const [query, setQuery] = useState(new URLSearchParams(location.search).get('search') || '');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [historyError, setHistoryError] = useState('');
   const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const [chainSnapshot, history] = await Promise.all([
-        getChainSnapshot(20),
-        getIndexedHistory({ scope: 'transfers', limit: TRANSFER_PAGE_SIZE }),
-      ]);
-      setSnapshot(chainSnapshot);
+    const [snapshotResult, historyResult] = await Promise.allSettled([
+      getChainSnapshot(20),
+      getIndexedHistory({ scope: 'transfers', limit: TRANSFER_PAGE_SIZE }),
+    ]);
+    if (snapshotResult.status === 'fulfilled') {
+      setSnapshot(snapshotResult.value);
+      setError('');
+    } else {
+      setError(snapshotResult.reason?.message || 'Impossible de joindre le réseau Claydecoin.');
+    }
+    if (historyResult.status === 'fulfilled') {
+      const history = historyResult.value;
       setTransferHistory(history);
       setTransferRecords((current) => [
         ...history.records,
         ...current.slice(TRANSFER_PAGE_SIZE).filter((record) =>
           !history.records.some(({ hash }) => hash === record.hash)),
       ]);
-      setError('');
-    } catch (loadError) {
-      setError(loadError.message || 'Impossible de joindre le RPC Sepolia.');
-    } finally {
-      setLoading(false);
+      setHistoryError('');
+    } else {
+      setHistoryError(historyResult.reason?.message || 'Impossible de charger l’historique des transferts CYD.');
     }
+    setLoading(false);
   }, []);
 
   async function loadMoreTransfers() {
@@ -51,7 +57,7 @@ function App() {
       });
       setTransferHistory(history);
     } catch (historyError) {
-      setError(historyError.message || 'Impossible de charger l’historique des transferts CYD.');
+      setHistoryError(historyError.message || 'Impossible de charger l’historique des transferts CYD.');
     } finally {
       setHistoryLoading(false);
     }
@@ -70,6 +76,12 @@ function App() {
     void searchChain(initialSearch)
       .then(setResult)
       .catch((lookupError) => setSearchError(lookupError.message || 'Recherche impossible.'));
+  }, []);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    const target = tab === 'blocks' ? 'blocks' : tab === 'transactions' ? 'transactions' : '';
+    if (target) document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   async function onSearch(event) {
@@ -100,9 +112,9 @@ function App() {
       <main>
         <section className="explorer-hero">
           <div className="hero-glow" />
-          <p className="explorer-kicker"><FaShieldAlt /> EXPLORATEUR CLAYDE · SEPOLIA</p>
-          <h1>Chaque bloc.<br /><span>Chaque transaction CYD.</span></h1>
-          <p className="hero-copy">Explorez les transferts du jeton CYD ERC‑20 sur le réseau de test Sepolia.</p>
+          <p className="explorer-kicker"><FaShieldAlt /> EXPLORATEUR BLOCKCHAIN · CLAYDECOIN</p>
+          <h1>Explorez la blockchain.<br /><span>Suivez les transferts CYD.</span></h1>
+          <p className="hero-copy">Recherchez des blocs, transactions et adresses, puis vérifiez l’activité du token CYD.</p>
           <form className="search-box explorer-search" onSubmit={onSearch}>
             <FaSearch /><input aria-label="Rechercher un bloc, une transaction ou une adresse" placeholder="Rechercher un bloc, une transaction ou une adresse…" value={query} onChange={(event) => setQuery(event.target.value)} />
             <button className="primary-button" type="submit">Rechercher</button>
@@ -111,12 +123,12 @@ function App() {
         </section>
 
         <section className="explorer-content">
-          {error && <div className="error-banner" role="alert">{error} — vérifiez la configuration du contrat CYD et la disponibilité du RPC Sepolia.</div>}
+          {error && <div className="error-banner" role="alert">{error} — vérifiez la configuration du contrat CYD et la connexion au réseau Claydecoin.</div>}
           <div className="stats-grid">
             <Stat icon={FaCube} tone="blue" label="Blocs" value={snapshot ? (snapshot.latestBlock + 1).toLocaleString('fr-FR') : '—'} />
             <Stat icon={FaExchangeAlt} tone="green" label="Transferts CYD" value={(transferHistory?.total ?? 0).toLocaleString('fr-FR')} />
             <Stat icon={FaUsers} tone="purple" label="Adresses actives" value={snapshot?.activeAddresses.toLocaleString('fr-FR') ?? '—'} />
-            <Stat icon={FaCoins} tone="orange" label="Token ERC-20" value="CYD" />
+            <Stat icon={FaCoins} tone="orange" label="Token CYD" value="CYD" />
           </div>
 
           {result && <SearchResult result={result} onClose={() => {
@@ -126,18 +138,19 @@ function App() {
           }} />}
 
           <div className="data-grid explorer-tables">
-            <section className="panel"><div className="panel-heading"><h2><FaCube /> Derniers blocs</h2><span>Voir les derniers</span></div>
+            <section className="panel" id="blocks"><div className="panel-heading"><h2><FaCube /> CLAYDECOIN</h2><span>Réseau de démonstration</span></div>
               <div className="panel-content table-wrap"><table><thead><tr><th>Bloc</th><th>Hash</th><th>Transactions</th><th>Horodatage</th></tr></thead>
                 <tbody>{blocks.slice(0, 10).map((block) => <tr key={block.hash}>
                   <td><button className="link-button" onClick={() => { setQuery(String(block.number)); void searchChain(String(block.number)).then(setResult).catch((err) => setSearchError(err.message)); }}>#{block.number.toLocaleString('fr-FR')}</button></td>
                   <td className="mono">{shorten(block.hash)}</td><td>{block.transactions}</td><td>{new Date(block.timestamp * 1000).toLocaleString('fr-FR')}</td>
                 </tr>)}</tbody></table>
-                {loading && <div className="empty-state">Lecture de Sepolia…</div>}
+                {loading && <div className="empty-state">Lecture des blocs…</div>}
                 {!loading && blocks.length === 0 && <div className="empty-state">Aucun bloc récent disponible.</div>}
               </div>
             </section>
 
-            <section className="panel"><div className="panel-heading"><h2><FaExchangeAlt /> Historique des transferts CYD</h2><span>{transferHistory?.total ?? 0} trouvé(s)</span></div>
+            <section className="panel" id="transactions"><div className="panel-heading"><h2><FaExchangeAlt /> Historique des transferts CYD</h2><span>{transferHistory?.total ?? 0} trouvé(s)</span></div>
+              {historyError && <div className="history-warning" role="status">Historique indisponible : {historyError}</div>}
               {transferHistory && !transferHistory.complete && <div className="history-sync" role="status">Indexation historique : bloc {Math.max(0, transferHistory.indexedThrough)} / {transferHistory.latestBlock}.</div>}
               {transferHistory?.error && <div className="error-banner" role="alert">{transferHistory.error}</div>}
               <div className="panel-content table-wrap history-index-table"><table><thead><tr><th>Hash</th><th>Bloc</th><th>De</th><th>Vers</th><th>Montant CYD</th><th>Frais réseau</th><th>Statut</th></tr></thead>
@@ -150,14 +163,14 @@ function App() {
                   <td>{transaction.fee ? `${formatCydUnits(BigInt(transaction.fee))} ETH` : 'Voir sur Etherscan'}</td>
                   <td><span className={`tag ${transaction.status === 1 ? 'success' : transaction.status === 0 ? 'error' : ''}`}>{transaction.status === 1 ? 'Confirmée' : transaction.status === 0 ? 'Échouée' : 'En attente'}</span></td>
                 </tr>)}</tbody></table>
-                {!loading && transfers.length === 0 && <div className="empty-state">Aucun transfert CYD trouvé pour le moment.</div>}
+                {!loading && transfers.length === 0 && !historyError && <div className="empty-state">Aucun transfert CYD trouvé pour le moment.</div>}
                 {transfers.length < (transferHistory?.total ?? 0) && <button className="history-more" onClick={loadMoreTransfers} disabled={historyLoading}>{historyLoading ? 'Chargement…' : 'Charger les transactions précédentes'}</button>}
               </div>
             </section>
           </div>
 
-          <section className="explorer-promo"><div><strong>Clayde Chain Explorer</strong><p>Une vision transparente de Clayde Chain.</p></div><a href={CHAIN.blockchainUrl}>Tableau de bord <FaArrowRight /></a></section>
-          <footer className="footer-note">Sepolia · Chain ID {CHAIN.id.toString()} · CYD ERC‑20 {CHAIN.tokenAddress ? shorten(CHAIN.tokenAddress) : 'à configurer'} · <a href="https://sepolia.etherscan.io" target="_blank" rel="noreferrer">Sepolia Etherscan</a></footer>
+          <section className="explorer-promo"><div><strong>Claydecoin.Explorateur</strong><p>Consultez les blocs et l’activité du token CYD sur un réseau de démonstration.</p></div><a href={CHAIN.blockchainUrl}>Tableau de bord <FaArrowRight /></a></section>
+          <footer className="footer-note">Réseau Claydecoin de démonstration · CYD {CHAIN.tokenAddress ? shorten(CHAIN.tokenAddress) : 'à configurer'} · actif de démonstration</footer>
         </section>
       </main>
     </div>

@@ -9,6 +9,7 @@ import {
   parseUnits,
 } from 'ethers';
 import { fetchContractTransferLogs } from './blockscout.js';
+import { getStoredWallet, getStoredWallets, saveStoredWallet } from './wallet-storage.js';
 import deployment from '../../contracts/sepolia-deployment.json';
 
 const transferInterface = new Interface([
@@ -21,7 +22,6 @@ const provider = new JsonRpcProvider(
   11155111,
   { staticNetwork: true },
 );
-const WALLET_STORAGE_KEY = 'clayde.wallet.keystore';
 const eventCache = { logs: null, refreshedAt: 0, pending: null };
 const HISTORY_CACHE_TTL_MS = 15_000;
 const RPC_HEAD_SAFETY_BLOCKS = 2;
@@ -58,13 +58,10 @@ export async function createBrowserWallet(password) {
   if (password.length < 12) {
     throw new Error('Choisissez un mot de passe d’au moins 12 caractères.');
   }
-  if (window.localStorage.getItem(WALLET_STORAGE_KEY)) {
-    throw new Error('Un portefeuille est déjà enregistré. Téléchargez sa sauvegarde ou utilisez un autre profil de navigateur.');
-  }
   const wallet = Wallet.createRandom();
   const keystore = await wallet.encrypt(password);
   const connectedWallet = await connectBrowserWallet(wallet);
-  window.localStorage.setItem(WALLET_STORAGE_KEY, keystore);
+  saveStoredWallet(window.localStorage, connectedWallet.address, keystore);
   return connectedWallet;
 }
 
@@ -75,37 +72,63 @@ export async function importBrowserWallet(keystore, password) {
   }
   const wallet = await Wallet.fromEncryptedJson(contents, password);
   const connectedWallet = await connectBrowserWallet(wallet);
-  const existingKeystore = window.localStorage.getItem(WALLET_STORAGE_KEY);
-  if (existingKeystore && existingKeystore !== contents) {
-    throw new Error('Un autre portefeuille est déjà enregistré. Sauvegardez-le ou utilisez un autre profil de navigateur.');
-  }
-  window.localStorage.setItem(WALLET_STORAGE_KEY, contents);
+  saveStoredWallet(window.localStorage, connectedWallet.address, contents);
   return connectedWallet;
 }
 
-export async function unlockBrowserWallet(password) {
-  const keystore = window.localStorage.getItem(WALLET_STORAGE_KEY);
-  if (!keystore) {
+export async function importBrowserWalletFromPhrase(phrase, password) {
+  const normalizedPhrase = phrase.trim().split(/\s+/).join(' ');
+  if (!normalizedPhrase) {
+    throw new Error('Saisissez la phrase de récupération du portefeuille.');
+  }
+  if (password.length < 12) {
+    throw new Error('Choisissez un mot de passe d’au moins 12 caractères.');
+  }
+  const wallet = Wallet.fromPhrase(normalizedPhrase);
+  const keystore = await wallet.encrypt(password);
+  const connectedWallet = await connectBrowserWallet(wallet);
+  saveStoredWallet(window.localStorage, connectedWallet.address, keystore);
+  return connectedWallet;
+}
+
+export async function unlockBrowserWallet(password, address) {
+  const wallets = getStoredWallets(window.localStorage);
+  if (!wallets.length) {
     throw new Error('Aucun portefeuille enregistré. Créez un portefeuille ou importez son fichier chiffré.');
   }
-  const wallet = await Wallet.fromEncryptedJson(keystore, password);
+  const selectedAddress = address || (wallets.length === 1 ? wallets[0].address : '');
+  if (!selectedAddress) {
+    throw new Error('Choisissez le portefeuille que vous souhaitez ouvrir.');
+  }
+  const savedWallet = getStoredWallet(window.localStorage, selectedAddress);
+  if (!savedWallet) {
+    throw new Error('Le portefeuille choisi n’est plus enregistré dans ce navigateur.');
+  }
+  const wallet = await Wallet.fromEncryptedJson(savedWallet.keystore, password);
+  if (wallet.address.toLowerCase() !== savedWallet.address.toLowerCase()) {
+    throw new Error('Le fichier déchiffré ne correspond pas à l’adresse du portefeuille enregistré.');
+  }
   return connectBrowserWallet(wallet);
 }
 
-export function hasBrowserWallet() {
-  return Boolean(window.localStorage.getItem(WALLET_STORAGE_KEY));
+export function getBrowserWalletAddresses() {
+  return getStoredWallets(window.localStorage).map(({ address }) => address);
 }
 
-export function downloadWalletBackup() {
-  const keystore = window.localStorage.getItem(WALLET_STORAGE_KEY);
-  if (!keystore) {
+export function hasBrowserWallet() {
+  return getStoredWallets(window.localStorage).length > 0;
+}
+
+export function downloadWalletBackup(address) {
+  const savedWallet = getStoredWallet(window.localStorage, address);
+  if (!savedWallet) {
     throw new Error('Aucun portefeuille chiffré à sauvegarder dans ce navigateur.');
   }
-  const blob = new Blob([keystore], { type: 'application/json' });
+  const blob = new Blob([savedWallet.keystore], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'clayde-wallet-keystore.json';
+  link.download = `clayde-wallet-${savedWallet.address.slice(2, 8).toLowerCase()}.json`;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -210,6 +233,18 @@ export async function getCydBalance(address) {
   return tokenContract().balanceOf(getAddress(address));
 }
 
+export async function getEthBalance(address) {
+  return provider.getBalance(getAddress(address));
+}
+
+export function formatEthUnits(value, maximumFractionDigits = 6) {
+  const decimal = formatUnits(BigInt(value), 18);
+  const [whole, fraction = ''] = decimal.split('.');
+  const displayedFraction = fraction.slice(0, maximumFractionDigits).replace(/0+$/, '');
+  const groupedWhole = BigInt(whole).toLocaleString('fr-FR');
+  return `${groupedWhole}${displayedFraction ? `,${displayedFraction}` : ''}`;
+}
+
 export async function getChainSnapshot(blockLimit = 20) {
   const latestBlock = await provider.getBlockNumber();
   const start = Math.max(0, latestBlock - blockLimit + 1);
@@ -272,7 +307,7 @@ export async function searchChain(value) {
   const query = value.trim();
   if (/^\d+$/.test(query)) {
     const block = await provider.getBlock(Number(query), true);
-    if (!block) throw new Error(`Bloc #${query} introuvable sur Sepolia.`);
+    if (!block) throw new Error(`Bloc #${query} introuvable sur le réseau Ethereum.`);
     const logs = await loadTransferLogs(Number(query), Number(query));
     return { type: 'block', block, transfers: await normalizeLogs(logs) };
   }
@@ -281,7 +316,7 @@ export async function searchChain(value) {
       provider.getTransaction(query),
       provider.getTransactionReceipt(query),
     ]);
-    if (!transaction) throw new Error('Transaction introuvable sur Sepolia.');
+    if (!transaction) throw new Error('Transaction introuvable sur le réseau Ethereum.');
     const tokenTransfers = (receipt?.logs || [])
       .filter((log) => log.address.toLowerCase() === getTokenAddress().toLowerCase()
         && log.topics[0] === transferTopic)
@@ -333,10 +368,10 @@ export async function estimateCydTransfer(signer, recipient, amount) {
     contract.balanceOf(await signer.getAddress()),
   ]);
   const feePerGas = feeData.gasPrice ?? feeData.maxFeePerGas;
-  if (feePerGas === null) throw new Error('Impossible de récupérer les frais Sepolia.');
+  if (feePerGas === null) throw new Error('Impossible de récupérer les frais du réseau Ethereum.');
   if (tokenBalance < value) throw new Error('Solde CYD insuffisant.');
   const fee = gasLimit * feePerGas;
-  if (balance < fee) throw new Error('Solde Sepolia ETH insuffisant pour payer les frais de transaction.');
+  if (balance < fee) throw new Error('Solde ETH de démonstration insuffisant pour payer les frais de transaction.');
   return { gasLimit, fee, value };
 }
 

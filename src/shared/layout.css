@@ -93,8 +93,8 @@ tbody tr:hover { background: #f8fbff; }
 }
 @media (max-width: 460px) {
   .stats-grid { gap: 8px; }
-  .stat-card { min-height: 78px; gap: 9px; padding: 10px; }
+  .stat-card { min-width: 0; min-height: 78px; gap: 9px; padding: 10px; }
   .stat-icon { width: 36px; height: 36px; flex-basis: 36px; font-size: 17px; }
-  .stat-value { font-size: 18px; }
+  .stat-value { font-size: 15px; white-space: normal; overflow-wrap: anywhere; }
   .page-header { flex-direction: column; }
 }

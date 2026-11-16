@@ -7,6 +7,7 @@ const root = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
+  cacheDir: path.join(root, 'node_modules', '.vite', 'blockchain'),
   plugins: [react()],
   envDir: root,
   server: { strictPort: true, fs: { allow: [root] } },

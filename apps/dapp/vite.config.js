@@ -7,7 +7,17 @@ const root = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
+  cacheDir: path.join(root, 'node_modules', '.vite', 'dapp'),
   plugins: [react()],
   envDir: root,
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'ethers', test: /node_modules[\\/]ethers[\\/]/ }],
+        },
+      },
+    },
+  },
   server: { strictPort: true, fs: { allow: [root] } },
 });

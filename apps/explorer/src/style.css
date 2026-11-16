@@ -17,6 +17,8 @@
 .explorer-search .primary-button { min-width: 120px; }
 .search-error { color: #ffd1d6; font-size: 12px; }
 .explorer-content { max-width: 1360px; margin: 0 auto; padding: 24px clamp(14px, 3vw, 38px) 28px; }
+.explorer-tables > .panel { scroll-margin-top: 16px; }
+.history-warning { padding: 10px 16px; color: #805b0b; background: #fff7df; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .explorer-tables .panel { min-width: 0; }
 .explorer-tables .panel-content { padding: 0 8px 8px; }
 .explorer-tables table { min-width: 490px; }
@@ -47,3 +49,15 @@
   .explorer-search input { flex-basis: calc(100% - 42px); }
   .explorer-search .primary-button { width: 100%; }
 }
+.explorer-page .explorer-header { background: #102a43; }
+.explorer-page .explorer-brand .brand-mark { background: linear-gradient(140deg, #2584d8, #4568d9); }
+.explorer-page .explorer-hero { color: #18324c; background: linear-gradient(120deg, #eff6fc, #e7f1fa); }
+.explorer-page .hero-glow { opacity: .14; background: #2584d8; }
+.explorer-page .explorer-kicker { color: #23689e; }
+.explorer-page .explorer-hero h1 { color: #173a59; }
+.explorer-page .explorer-hero h1 span { color: #287dbb; }
+.explorer-page .hero-copy { color: #5c7185; }
+.explorer-page .explorer-search { border-color: #d7e3ef; box-shadow: 0 8px 26px #27476614; }
+.explorer-page .explorer-search > svg { color: #567d9e; }
+.explorer-page .explorer-tables .panel-heading { background: linear-gradient(100deg, #174a78, #1d68ad); }
+.explorer-page .link-button { color: #1768a7; }

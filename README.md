@@ -4,9 +4,9 @@ Le projet comprend trois interfaces : tableau de bord, explorateur et portefeuil
 DApp. Pour la publication en ligne, elles utilisent le jeton ERC-20 CYD sur Sepolia
 et se déploient gratuitement sur GitHub Pages.
 
-- **Blockchain** — tableau de bord des blocs, transactions et adresses actives.
-- **Explorer** — recherche de blocs, transactions et adresses.
-- **DApp** — portefeuille autonome chiffré, transferts CYD et historique du token.
+- **Blockchain** — tableau de bord du réseau Ethereum Sepolia et de l’activité CYD.
+- **Explorer** — recherche de blocs, transactions et adresses Sepolia.
+- **DApp** — portefeuille CYD de démonstration, transferts, demandes de paiement et historique.
 
 Le projet se trouve dans `d_app_blockchain_local`. L’ancien `d_app_blockchain` et ses
 données ne sont ni déplacés, ni effacés, ni modifiés par ce projet.
@@ -37,13 +37,17 @@ Gardez le terminal ouvert. Ouvrez ensuite :
 - Explorer : <http://127.0.0.1:5174>
 - DApp : <http://127.0.0.1:5175>
 
-La DApp peut créer un portefeuille autonome ou importer un fichier JSON chiffré.
-Les transactions sont signées localement avec ce portefeuille, sans MetaMask; les
-frais sont payés en Sepolia ETH. CYD est un jeton de test ERC-20 sans valeur réelle.
-Une sauvegarde JSON et son mot de passe sont indispensables pour restaurer un wallet.
-La DApp n’accepte pas les phrases secrètes ou les clés privées en clair. Les utilisateurs
-doivent également avoir des Sepolia ETH pour payer le gaz et recevoir des CYD du
-portefeuille qui possède l’offre initiale.
+La DApp peut créer plusieurs portefeuilles, restaurer une phrase de récupération ou importer
+un fichier JSON chiffré. Après verrouillage, choisissez de rouvrir un portefeuille déjà
+enregistré, d’en créer un autre ou d’en importer un. Lors de la création, la phrase de
+récupération n’est montrée qu’une fois : sauvegardez-la hors ligne. Chaque portefeuille
+est chiffré avec son mot de passe dans le navigateur; les transactions sont signées côté
+client et ne nécessitent pas MetaMask. La DApp permet aussi de générer un lien de demande
+de paiement CYD.
+Les frais de transaction sont payés en Sepolia ETH et CYD est un jeton de test sans
+valeur réelle. Ce portefeuille web est un prototype pédagogique, pas un portefeuille
+de production : ne l’utilisez pas pour stocker des actifs réels et ne saisissez jamais
+une phrase associée à des fonds réels.
 
 ## Ancien réseau local Besu (historique)
 
@@ -54,6 +58,18 @@ préfinancé et de l’index `.besu` concernent uniquement ces anciennes donnée
 
 Les anciens scripts Besu et les données `.besu` sont conservés à titre historique.
 Ils ne sont pas utilisés par les interfaces Sepolia actuelles.
+
+### Persistance du réseau Besu local
+
+Chaque validateur Besu utilise un volume Docker nommé distinct (`validator1-data`
+à `validator4-data`) pour conserver sa base de données entre les arrêts et les
+redémarrages des conteneurs. Les volumes apparaissent dans **Docker Desktop >
+Volumes** sous le nom de projet `clayde-local-platform`. Les clés des validateurs
+et la configuration Genesis restent dans `.besu/generated`.
+
+`npm run network:down` arrête les conteneurs sans supprimer les volumes. Ne lancez
+pas `docker compose down --volumes` et ne supprimez pas ces volumes dans Docker
+Desktop, sinon les données locales de la chaîne seront effacées.
 
 ## Builds
 
@@ -96,12 +112,12 @@ pas les anciens soldes CYD de Besu et ne crée aucun pont entre les deux réseau
    <https://melvin-132.github.io/d_app_blockchain_local/>. Les pages sont aussi
    disponibles sous `/blockchain/`, `/explorer/` et `/dapp/`.
 
-Le wallet principal de chaque utilisateur est déchiffré et conservé en mémoire dans
-son navigateur; seule sa sauvegarde chiffrée peut être enregistrée localement. Le
-tableau de bord et l’explorateur interrogent le RPC public Sepolia et filtrent tous
-les événements `Transfer` émis par le contrat depuis son bloc de création; ils n’ont
-pas de chaîne privée ni de base d’historique séparée. Le RPC public a des limites de
-requêtes; le réseau Sepolia est un réseau de test qui peut être réinitialisé.
+Le wallet est déchiffré en mémoire pendant son utilisation; seul le keystore chiffré
+est conservé dans le stockage local du navigateur. Le tableau de bord lit les blocs
+récents via le RPC public Sepolia. L’historique CYD est chargé depuis l’indexeur
+Blockscout Sepolia; sa disponibilité dépend donc du RPC et d’un service public tiers.
+Ces interfaces n’exécutent pas Clayde Chain : elles affichent les données du contrat
+ERC-20 sur le réseau de test Sepolia, qui peut être réinitialisé.
 
 ## Ancienne démo GitHub Codespaces
 
