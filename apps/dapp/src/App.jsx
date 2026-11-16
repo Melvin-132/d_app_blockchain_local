@@ -416,7 +416,19 @@ function App() {
             </article>
             <article className="asset-card">
               <span className="asset-symbol eth-symbol">Ξ</span><span className="asset-meta">ETH de démonstration<small>Frais de réseau</small></span>
-              <strong>{ethBalance || '…'} <small>ETH</small></strong><a href={`${CHAIN.explorerUrl}?search=${account}`} target="_blank" rel="noreferrer">Voir l’adresse <FaExternalLinkAlt /></a>
+              <div className="asset-balance-row">
+                <strong>{ethBalance || '…'} <small>ETH</small></strong>
+                <a
+                  className="faucet-link"
+                  href="https://sepolia-faucet.pk910.de/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Obtenir des ETH de test avec le faucet Sepolia PoW de PK910"
+                >
+                  Obtenir des ETH de test <FaExternalLinkAlt />
+                </a>
+              </div>
+              <a href={`${CHAIN.explorerUrl}?search=${account}`} target="_blank" rel="noreferrer">Voir l’adresse <FaExternalLinkAlt /></a>
             </article>
           </section>
           <section className="wallet-actions" aria-label="Actions du portefeuille">

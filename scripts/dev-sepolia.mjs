@@ -26,7 +26,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 for (const app of apps) {
-  const child = spawn(process.execPath, [
+  const args = [
     viteCli,
     app.path,
     '--config',
@@ -35,7 +35,9 @@ for (const app of apps) {
     '127.0.0.1',
     '--port',
     String(app.port),
-  ], { cwd: root, stdio: 'inherit', env: process.env });
+  ];
+  if (app.name === 'DApp') args.push('--open');
+  const child = spawn(process.execPath, args, { cwd: root, stdio: 'inherit', env: process.env });
   children.push(child);
   child.once('error', (error) => {
     console.error(`Impossible de démarrer ${app.name} : ${error.message}`);

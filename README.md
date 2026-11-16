@@ -28,14 +28,19 @@ Après le déploiement du contrat, son adresse et son bloc sont enregistrés dan
 Besu :
 
 ```powershell
-npm run dev:sepolia
+npm run dev
 ```
 
-Gardez le terminal ouvert. Ouvrez ensuite :
+Cette commande démarre les trois interfaces et ouvre automatiquement le portefeuille
+dans le navigateur. Gardez le terminal ouvert. Les autres interfaces sont aussi
+disponibles ici :
 
 - Blockchain : <http://127.0.0.1:5173>
 - Explorer : <http://127.0.0.1:5174>
 - DApp : <http://127.0.0.1:5175>
+
+Pour le détail de chaque dossier, fichier, extension, module et dépendance, consultez
+le [guide complet de la structure du projet](./GUIDE_COMPLET_STRUCTURE_PROJET.md).
 
 La DApp peut créer plusieurs portefeuilles, restaurer une phrase de récupération ou importer
 un fichier JSON chiffré. Après verrouillage, choisissez de rouvrir un portefeuille déjà
@@ -44,14 +49,19 @@ récupération n’est montrée qu’une fois : sauvegardez-la hors ligne. Chaqu
 est chiffré avec son mot de passe dans le navigateur; les transactions sont signées côté
 client et ne nécessitent pas MetaMask. La DApp permet aussi de générer un lien de demande
 de paiement CYD.
-Les frais de transaction sont payés en Sepolia ETH et CYD est un jeton de test sans
-valeur réelle. Ce portefeuille web est un prototype pédagogique, pas un portefeuille
+Les frais de transaction sont payés en Sepolia ETH. Dans l’aperçu du portefeuille,
+le lien **Obtenir des ETH de test** ouvre le faucet Sepolia PoW PK910 dans un nouvel
+onglet. L’utilisateur y saisit son adresse, lance le calcul demandé, puis réclame les
+ETH de test lorsque le seuil est atteint. Ce calcul consomme les ressources de
+l’ordinateur; le fournisseur indique également appliquer des limites, notamment par
+adresse IP, donc le nombre de demandes quotidiennes n’est pas garanti. CYD est un jeton
+de test sans valeur réelle. Ce portefeuille web est un prototype pédagogique, pas un portefeuille
 de production : ne l’utilisez pas pour stocker des actifs réels et ne saisissez jamais
 une phrase associée à des fonds réels.
 
 ## Ancien réseau local Besu (historique)
 
-Les scripts `npm run dev`, `npm run network:up` et `npm run network:down` décrivent
+Les scripts `npm run dev:besu`, `npm run network:up` et `npm run network:down` décrivent
 l’ancien réseau QBFT local et ne sont pas nécessaires pour la version Sepolia ou le
 site GitHub Pages. Les sections ci-dessous qui parlent de Genesis, de portefeuille
 préfinancé et de l’index `.besu` concernent uniquement ces anciennes données locales.
@@ -91,7 +101,7 @@ fonction d’émission supplémentaire. CYD est un jeton de test sans valeur ré
 Sepolia ETH reste la monnaie native nécessaire aux frais. Ce déploiement ne convertit
 pas les anciens soldes CYD de Besu et ne crée aucun pont entre les deux réseaux.
 
-1. Démarrez les interfaces localement (`npm install`, puis `npm run dev:sepolia`) et
+1. Démarrez les interfaces localement (`npm install`, puis `npm run dev`) et
    créez un wallet dans **DApp CYD**. Téléchargez son fichier de sauvegarde chiffré.
 2. Copiez l’adresse publique affichée et obtenez des Sepolia ETH de test pour cette
    adresse auprès d’un faucet compatible. Les ETH de test ne sont pas de l’argent réel.

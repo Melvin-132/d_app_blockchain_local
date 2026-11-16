@@ -7,8 +7,9 @@
     "node": ">=22.13.0 <27"
   },
   "scripts": {
-    "dev": "node scripts/dev.mjs",
+    "dev": "node scripts/dev-sepolia.mjs",
     "dev:sepolia": "node scripts/dev-sepolia.mjs",
+    "dev:besu": "node scripts/dev.mjs",
     "token:deploy": "node scripts/deploy-cyd.mjs",
     "build:vercel": "node scripts/build-vercel.mjs",
     "test": "node --test scripts/blockscout-index.test.mjs scripts/history-index.test.mjs scripts/payment-request.test.mjs scripts/render-deploy.test.mjs scripts/wallet-storage.test.mjs",

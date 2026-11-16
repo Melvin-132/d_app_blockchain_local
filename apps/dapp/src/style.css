@@ -144,9 +144,17 @@
 .eth-symbol { color: #d9e6ff; background: linear-gradient(145deg, #4467a9, #263752); }
 .asset-meta { overflow: hidden; color: #ececf4; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .asset-meta small { display: block; margin-top: 4px; overflow: hidden; color: #858999; font-size: 9px; font-weight: 500; text-overflow: ellipsis; }
-.asset-card > strong { grid-column: 2; margin-top: 8px; color: #f5f3fc; font: 800 21px Manrope, sans-serif; overflow-wrap: anywhere; }
+.asset-card > strong, .asset-balance-row > strong { grid-column: 2; margin-top: 8px; color: #f5f3fc; font: 800 21px Manrope, sans-serif; overflow-wrap: anywhere; }
 .asset-card > strong small { color: #a4a8b7; font: 600 10px 'DM Sans', sans-serif; }
 .asset-card > a { grid-column: 2; display: inline-flex; align-items: center; gap: 6px; margin-top: 7px; color: #a392eb; font-size: 9px; }
+.asset-balance-row { grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; margin-top: 8px; }
+.asset-balance-row > strong { margin-top: 0; }
+.asset-card > .asset-balance-row > .faucet-link {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 0; padding: 6px 9px;
+  border: 1px solid #40375a; border-radius: 7px; color: #d3c7ff; background: #211d30;
+  font-size: 9px; font-weight: 700; line-height: 1.3;
+}
+.asset-card > .asset-balance-row > .faucet-link:hover { border-color: #8065d6; background: #302747; }
 .wallet-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; margin: 15px 0 20px; }
 .wallet-actions button {
   display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px;
