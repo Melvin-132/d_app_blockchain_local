@@ -1,4 +1,5 @@
 import {
+  BrowserProvider,
   Contract,
   Interface,
   JsonRpcProvider,
@@ -6,9 +7,17 @@ import {
   formatUnits,
   getAddress,
   id,
-  parseUnits,
 } from 'ethers';
-import { fetchContractTransferLogs } from './blockscout.js';
+import {
+  fetchContractTransferLogs,
+  fetchWalletTokenTransfers,
+  normalizeWalletTokenTransfers,
+} from './routescan.js';
+import { parseCydTransferAmount, parseEthTransferAmount } from './transfer-amount.js';
+import { normalizeRecoveryPhrase } from './recovery-phrase.js';
+import { getRetryLogRangeEnd } from './rpc-log-range.js';
+import { ensureWalletNetwork } from './wallet-network.js';
+import { assertStrongWalletPassword } from './wallet-password.js';
 import { getStoredWallet, getStoredWallets, saveStoredWallet } from './wallet-storage.js';
 import deployment from '../../contracts/sepolia-deployment.json';
 
@@ -17,15 +26,23 @@ const transferInterface = new Interface([
 ]);
 const transferTopic = id('Transfer(address,address,uint256)');
 const rpcUrl = import.meta.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+const ethereumMainnetRpcUrl = import.meta.env.VITE_ETHEREUM_MAINNET_RPC_URL
+  || 'https://ethereum-rpc.publicnode.com';
 const provider = new JsonRpcProvider(
   rpcUrl,
   11155111,
   { staticNetwork: true },
 );
-const eventCache = { logs: null, refreshedAt: 0, pending: null };
-const HISTORY_CACHE_TTL_MS = 15_000;
+const ethereumMainnetProvider = new JsonRpcProvider(
+  ethereumMainnetRpcUrl,
+  1,
+  { staticNetwork: true },
+);
 const RPC_HEAD_SAFETY_BLOCKS = 2;
+const CONTRACT_HISTORY_CACHE_TTL_MS = 30_000;
 const deploymentBlock = Number(import.meta.env.VITE_CYD_DEPLOYMENT_BLOCK || deployment.blockNumber);
+let contractHistoryCache = null;
+let contractHistoryRequest = null;
 const siteBase = import.meta.env.BASE_URL.replace(/(?:blockchain|explorer|dapp)\/$/, '');
 const pageUrl = (page, port) => import.meta.env.DEV
   ? `http://127.0.0.1:${port}/`
@@ -46,6 +63,17 @@ export const CHAIN = {
   dappUrl: pageUrl('dapp', 5175),
 };
 
+export const ETHEREUM_MAINNET = {
+  id: 1n,
+  hexId: '0x1',
+  name: 'Ethereum Mainnet',
+  symbol: 'ETH',
+  decimals: 18,
+  rpcUrl: ethereumMainnetRpcUrl,
+  explorerUrl: 'https://etherscan.io',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+};
+
 async function connectBrowserWallet(wallet) {
   const network = await provider.getNetwork();
   if (network.chainId !== CHAIN.id) {
@@ -55,9 +83,7 @@ async function connectBrowserWallet(wallet) {
 }
 
 export async function createBrowserWallet(password) {
-  if (password.length < 12) {
-    throw new Error('Choisissez un mot de passe d’au moins 12 caractères.');
-  }
+  assertStrongWalletPassword(password);
   const wallet = Wallet.createRandom();
   const keystore = await wallet.encrypt(password);
   const connectedWallet = await connectBrowserWallet(wallet);
@@ -77,18 +103,58 @@ export async function importBrowserWallet(keystore, password) {
 }
 
 export async function importBrowserWalletFromPhrase(phrase, password) {
-  const normalizedPhrase = phrase.trim().split(/\s+/).join(' ');
-  if (!normalizedPhrase) {
-    throw new Error('Saisissez la phrase de récupération du portefeuille.');
-  }
-  if (password.length < 12) {
-    throw new Error('Choisissez un mot de passe d’au moins 12 caractères.');
-  }
+  const normalizedPhrase = normalizeRecoveryPhrase(phrase);
+  assertStrongWalletPassword(password);
   const wallet = Wallet.fromPhrase(normalizedPhrase);
   const keystore = await wallet.encrypt(password);
   const connectedWallet = await connectBrowserWallet(wallet);
   saveStoredWallet(window.localStorage, connectedWallet.address, keystore);
   return connectedWallet;
+}
+
+async function getMetaMaskWallet(asset, accountRequestMethod) {
+  const injectedProvider = window.ethereum;
+  if (!injectedProvider?.request) {
+    throw new Error('MetaMask est introuvable. Installez ou activez son extension, puis réessayez.');
+  }
+  if (!['CYD', 'ETH'].includes(asset)) {
+    throw new Error('Choisissez CYD sur Sepolia ou ETH sur Ethereum Mainnet.');
+  }
+  const network = asset === 'ETH' ? ETHEREUM_MAINNET : CHAIN;
+
+  const accounts = await injectedProvider.request({ method: accountRequestMethod });
+  if (!Array.isArray(accounts) || !accounts[0]) {
+    throw new Error('MetaMask n’a pas partagé de compte avec cette application.');
+  }
+
+  await ensureWalletNetwork(injectedProvider, {
+    ...network,
+    nativeCurrency: asset === 'ETH'
+      ? ETHEREUM_MAINNET.nativeCurrency
+      : { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+    explorerUrl: asset === 'ETH'
+      ? ETHEREUM_MAINNET.explorerUrl
+      : 'https://sepolia.etherscan.io',
+  });
+
+  const browserProvider = new BrowserProvider(injectedProvider);
+  return browserProvider.getSigner(accounts[0]);
+}
+
+export function connectMetaMaskWallet(asset = 'CYD') {
+  return getMetaMaskWallet(asset, 'eth_requestAccounts');
+}
+
+export function reconnectMetaMaskWallet(asset = 'CYD') {
+  return getMetaMaskWallet(asset, 'eth_accounts');
+}
+
+export async function restoreBrowserWalletSession(privateKey, address) {
+  const wallet = new Wallet(privateKey);
+  if (wallet.address.toLowerCase() !== address.toLowerCase()) {
+    throw new Error('La clé de session ne correspond pas au portefeuille enregistré.');
+  }
+  return connectBrowserWallet(wallet);
 }
 
 export async function unlockBrowserWallet(password, address) {
@@ -164,37 +230,36 @@ async function loadTransferLogs(fromBlock, toBlock) {
   if (toBlock < fromBlock) return [];
   const contractAddress = getTokenAddress();
   const logs = [];
-  for (let start = fromBlock; start <= toBlock; start += 2000) {
+  for (let start = fromBlock; start <= toBlock;) {
     const end = Math.min(start + 1999, toBlock);
-    logs.push(...await provider.getLogs({
-      address: contractAddress,
-      topics: [transferTopic],
-      fromBlock: start,
-      toBlock: end,
-    }));
+    let queryEnd = end;
+    let result;
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        result = await provider.getLogs({
+          address: contractAddress,
+          topics: [transferTopic],
+          fromBlock: start,
+          toBlock: queryEnd,
+        });
+        break;
+      } catch (error) {
+        const retryEnd = getRetryLogRangeEnd(error, start, queryEnd);
+        if (retryEnd === null) throw error;
+        lastError = error;
+        queryEnd = retryEnd;
+      }
+    }
+    if (!result) {
+      if (lastError) throw lastError;
+      throw new Error('Le RPC Sepolia n’a pas pu lire les journaux jusqu’à sa tête actuelle.');
+    }
+    logs.push(...result);
+    if (queryEnd < end) break;
+    start = end + 1;
   }
   return logs;
-}
-
-async function allTransferLogs() {
-  const latestBlock = Math.max(
-    0,
-    await provider.getBlockNumber() - RPC_HEAD_SAFETY_BLOCKS,
-  );
-  if (!eventCache.logs || Date.now() - eventCache.refreshedAt >= HISTORY_CACHE_TTL_MS) {
-    if (!eventCache.pending) {
-      eventCache.pending = fetchContractTransferLogs(getTokenAddress(), transferTopic)
-        .then((logs) => {
-          eventCache.logs = logs.filter((log) => log.blockNumber >= deploymentBlock);
-          eventCache.refreshedAt = Date.now();
-        })
-        .finally(() => {
-          eventCache.pending = null;
-        });
-    }
-    await eventCache.pending;
-  }
-  return { latestBlock, logs: eventCache.logs };
 }
 
 async function normalizeLogs(logs) {
@@ -226,14 +291,50 @@ async function normalizeLogs(logs) {
       }],
     };
   }));
-  return records.sort((a, b) => b.blockNumber - a.blockNumber);
+  return records.sort((a, b) =>
+    b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
 }
 
-export async function getCydBalance(address) {
-  return tokenContract().balanceOf(getAddress(address));
+export async function getRecentCydHistory(address, limit = 50) {
+  const normalizedAddress = getAddress(address);
+  const contractAddress = getTokenAddress();
+  const latestBlock = await provider.getBlockNumber();
+  const fromBlock = Math.max(deploymentBlock, latestBlock - 1999);
+  const addressTopic = `0x${normalizedAddress.slice(2).toLowerCase().padStart(64, '0')}`;
+  const [outgoingLogs, incomingLogs] = await Promise.all([
+    provider.getLogs({
+      address: contractAddress,
+      topics: [transferTopic, addressTopic],
+      fromBlock,
+      toBlock: latestBlock,
+    }),
+    provider.getLogs({
+      address: contractAddress,
+      topics: [transferTopic, null, addressTopic],
+      fromBlock,
+      toBlock: latestBlock,
+    }),
+  ]);
+  const uniqueLogs = new Map();
+  for (const log of [...outgoingLogs, ...incomingLogs]) {
+    uniqueLogs.set(`${log.transactionHash.toLowerCase()}-${log.index}`, log);
+  }
+  const records = (await normalizeLogs([...uniqueLogs.values()])).slice(0, limit);
+  return { records, latestBlock };
 }
 
-export async function getEthBalance(address) {
+export async function getCydBalance(address, blockTag) {
+  const contract = tokenContract();
+  return blockTag === undefined
+    ? contract.balanceOf(getAddress(address))
+    : contract.balanceOf(getAddress(address), { blockTag });
+}
+
+export async function getMainnetEthBalance(address) {
+  return ethereumMainnetProvider.getBalance(getAddress(address));
+}
+
+export async function getSepoliaEthBalance(address) {
   return provider.getBalance(getAddress(address));
 }
 
@@ -283,20 +384,46 @@ export async function getChainSnapshot(blockLimit = 20) {
 }
 
 export async function getIndexedHistory({ scope, address, offset = 0, limit = 50 }) {
-  const { latestBlock, logs } = hasDeploymentConfiguration()
-    ? await allTransferLogs()
-    : { latestBlock: await provider.getBlockNumber(), logs: [] };
-  const matchingLogs = logs.filter((log) => {
-    if (!address) return true;
-    const parsed = transferInterface.parseLog(log);
-    const target = getAddress(address).toLowerCase();
-    return parsed.args.from.toLowerCase() === target || parsed.args.to.toLowerCase() === target;
-  }).sort((a, b) => b.blockNumber - a.blockNumber || b.index - a.index);
-  const records = await normalizeLogs(matchingLogs.slice(offset, offset + limit));
+  const contractAddress = getTokenAddress();
+  if (!address) {
+    if (scope !== 'transfers') {
+      throw new Error('Une adresse de portefeuille est requise pour charger son historique.');
+    }
+    const now = Date.now();
+    let logs;
+    if (contractHistoryCache?.contractAddress === contractAddress
+      && now - contractHistoryCache.fetchedAt < CONTRACT_HISTORY_CACHE_TTL_MS) {
+      logs = contractHistoryCache.logs;
+    } else if (contractHistoryRequest) {
+      logs = await contractHistoryRequest;
+    } else {
+      contractHistoryRequest = fetchContractTransferLogs(contractAddress, deploymentBlock);
+      try {
+        logs = await contractHistoryRequest;
+        contractHistoryCache = { contractAddress, fetchedAt: Date.now(), logs };
+      } finally {
+        contractHistoryRequest = null;
+      }
+    }
+    const records = (await normalizeLogs(logs)).slice(offset, offset + limit);
+    const latestBlock = logs.reduce((latest, log) => Math.max(latest, log.blockNumber), 0);
+    return {
+      scope,
+      records,
+      total: logs.length,
+      indexedThrough: latestBlock,
+      latestBlock,
+      complete: true,
+    };
+  }
+  const transfers = await fetchWalletTokenTransfers(getAddress(address), contractAddress);
+  const records = normalizeWalletTokenTransfers(transfers, contractAddress)
+    .slice(offset, offset + limit);
+  const latestBlock = transfers.length ? Number(transfers[0].blockNumber) : 0;
   return {
     scope,
     records,
-    total: matchingLogs.length,
+    total: transfers.length,
     indexedThrough: latestBlock,
     latestBlock,
     complete: true,
@@ -359,7 +486,7 @@ export function formatCydUnits(value, maximumFractionDigits = 18) {
 
 export async function estimateCydTransfer(signer, recipient, amount) {
   const to = getAddress(recipient);
-  const value = parseUnits(amount.replace(',', '.'), 18);
+  const value = parseCydTransferAmount(amount);
   const contract = tokenContract(signer);
   const [gasLimit, feeData, balance, tokenBalance] = await Promise.all([
     contract.transfer.estimateGas(to, value),
@@ -380,4 +507,43 @@ export async function sendCyd(signer, recipient, amount) {
   return tokenContract(signer).transfer(getAddress(recipient), estimate.value, {
     gasLimit: estimate.gasLimit,
   });
+}
+
+export async function estimateEthTransfer(signer, recipient, amount) {
+  const to = getAddress(recipient);
+  const value = parseEthTransferAmount(amount);
+  const mainnetSigner = await getEthereumMainnetSigner(signer);
+  const [gasLimit, feeData, balance] = await Promise.all([
+    mainnetSigner.estimateGas({ to, value }),
+    ethereumMainnetProvider.getFeeData(),
+    ethereumMainnetProvider.getBalance(await mainnetSigner.getAddress()),
+  ]);
+  const feePerGas = feeData.gasPrice ?? feeData.maxFeePerGas;
+  if (feePerGas === null) throw new Error('Impossible de récupérer les frais du réseau Ethereum.');
+  const fee = gasLimit * feePerGas;
+  if (balance < value + fee) {
+    throw new Error('Solde ETH insuffisant pour le montant et les frais de réseau.');
+  }
+  return { gasLimit, fee, value };
+}
+
+export async function sendEth(signer, recipient, amount) {
+  const mainnetSigner = await getEthereumMainnetSigner(signer);
+  const estimate = await estimateEthTransfer(mainnetSigner, recipient, amount);
+  return mainnetSigner.sendTransaction({
+    to: getAddress(recipient),
+    value: estimate.value,
+    gasLimit: estimate.gasLimit,
+  });
+}
+
+async function getEthereumMainnetSigner(signer) {
+  if (signer.provider instanceof BrowserProvider) {
+    const network = await signer.provider.getNetwork();
+    if (network.chainId !== ETHEREUM_MAINNET.id) {
+      throw new Error('Connectez MetaMask au réseau Ethereum Mainnet pour envoyer de vrais ETH.');
+    }
+    return signer;
+  }
+  return signer.connect(ethereumMainnetProvider);
 }

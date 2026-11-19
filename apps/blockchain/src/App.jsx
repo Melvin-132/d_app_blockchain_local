@@ -6,7 +6,7 @@ const NAV = [
   { label: 'Vue d’ensemble', icon: FaThLarge, href: CHAIN.blockchainUrl },
   { label: 'Blocs', icon: FaCube, href: `${CHAIN.explorerUrl}?tab=blocks` },
   { label: 'Transactions', icon: FaExchangeAlt, href: `${CHAIN.explorerUrl}?tab=transactions` },
-  { label: 'Token CYD', icon: FaCoins, href: CHAIN.dappUrl },
+  { label: 'DApp Wallet', icon: FaCoins, href: CHAIN.dappUrl },
   { label: 'Paramètres', icon: FaCog, href: '#settings' },
   { label: 'À propos', icon: FaInfoCircle, href: '#about' },
 ];

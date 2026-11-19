@@ -105,7 +105,7 @@ function App() {
     <div className="explorer-page">
       <header className="explorer-header">
         <a className="explorer-brand" href={CHAIN.explorerUrl}><span className="brand-mark">C</span><span>CLAYDE<span>SCAN</span><small>EXPLORATEUR DE BLOCS</small></span></a>
-        <nav><a href={CHAIN.blockchainUrl}>Blockchain</a><a className="active" href={CHAIN.explorerUrl}>Explorer</a><a href={CHAIN.dappUrl}>DApp CYD</a></nav>
+        <nav><a href={CHAIN.blockchainUrl}>Blockchain</a><a className="active" href={CHAIN.explorerUrl}>Explorer</a><a href={CHAIN.dappUrl}>DApp Wallet</a></nav>
         <span className={`status-pill ${snapshot ? 'success' : 'error'}`}><span className={snapshot ? 'online-dot' : 'offline-dot'} />{snapshot ? 'Réseau en ligne' : 'Hors ligne'}</span>
       </header>
 

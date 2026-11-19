@@ -36,7 +36,7 @@ d_app_blockchain_local/
 ├── apps/
 │   ├── blockchain/                 # Tableau de bord
 │   ├── explorer/                   # Explorateur
-│   └── dapp/                       # Portefeuille DApp
+│   └── dapp/                       # Portefeuille DApp et assets statiques
 ├── contracts/                      # Contrat CYD et configuration de déploiement
 ├── network/besu/                   # Configuration de l’ancien réseau local Besu
 ├── scripts/                        # Démarrage, déploiement, serveur historique et tests
@@ -50,7 +50,7 @@ d_app_blockchain_local/
 └── fichiers de configuration à la racine
 ```
 
-Les dossiers comme `node_modules/`, `apps/*/dist/`, `public/`, `_site/` et `.besu/` sont des dépendances installées, des sorties de compilation ou des données locales. Ils ne constituent pas les sources principales de l’application.
+`node_modules/`, `apps/*/dist/`, `_site/` et `.besu/` contiennent des dépendances installées, des sorties de compilation ou des données locales. À l’inverse, `apps/dapp/public/claydecoin-logo.png` est un asset source statique copié dans le build.
 
 ## 3. Les trois applications
 
@@ -82,8 +82,9 @@ Chaque sous-dossier d’application suit le même principe :
 
 - `apps/dapp/index.html` : métadonnées HTML et conteneur React du portefeuille.
 - `apps/dapp/src/main.jsx` : point de démarrage React; charge les styles communs et ceux de la DApp.
-- `apps/dapp/src/App.jsx` : interface et orchestration du portefeuille : choix d’un wallet enregistré, création, import de keystore JSON, restauration par phrase de récupération, verrouillage, sauvegarde chiffrée, consultation des soldes, réception, demande de paiement, estimation des frais et confirmation d’un transfert. Le lien du solde ETH ouvre le faucet Sepolia PoW PK910 dans un nouvel onglet; l’utilisateur y saisit lui-même l’adresse. Les opérations blockchain elles-mêmes sont déléguées à `sepolia.js`; les liens de paiement sont fabriqués par `payment-request.js`.
+- `apps/dapp/src/App.jsx` : interface et orchestration du portefeuille : accueil animé, création avec confirmation de sauvegarde de la phrase, import BIP-39 de 12/15/18/21/24 mots, connexion MetaMask, ouverture d’un wallet enregistré, import de keystore JSON, verrouillage, choix des actifs, soldes, QR de réception, estimation des frais et confirmation des transferts. CYD utilise Sepolia (ETH de test pour ses frais); ETH utilise Ethereum Mainnet (vrais soldes, transactions et frais). Les opérations blockchain sont déléguées à `sepolia.js`; les liens de partage sont fabriqués par `payment-request.js`.
 - `apps/dapp/src/style.css` : styles du portefeuille, de son écran d’accès, des formulaires d’envoi/réception, des historiques, des avertissements et de la navigation mobile.
+- `apps/dapp/public/claydecoin-logo.png` : logo Claydecoin/CYD en PNG avec transparence circulaire, utilisé dans le sélecteur d’actifs et les soldes.
 - `apps/dapp/vite.config.js` : configuration Vite propre à la DApp. Son cache est séparé dans `node_modules/.vite/dapp`; le découpage du bundle isole `ethers` dans un paquet chargé séparément.
 
 Les trois configurations Vite séparent leurs caches. Cette séparation évite qu’un serveur de développement réutilise par erreur des dépendances mises en cache par une autre interface.
@@ -92,21 +93,29 @@ Les trois configurations Vite séparent leurs caches. Cette séparation évite q
 
 ### Modules JavaScript
 
-- `src/shared/sepolia.js` — **module blockchain principal des trois interfaces actuelles.** Il configure `ethers` pour Sepolia et fournit notamment :
+- `src/shared/sepolia.js` — **module blockchain principal des interfaces.** Il configure `ethers` pour Sepolia et Ethereum Mainnet, et fournit notamment :
   - les informations de chaîne et les URL entre interfaces (`CHAIN`);
   - la création, l’import, le déverrouillage et la sauvegarde de wallets chiffrés;
-  - la lecture des soldes CYD et ETH;
+  - la lecture du solde CYD et de l’ETH Sepolia pour le gas CYD, et la lecture du vrai solde ETH sur Mainnet;
   - la lecture des blocs et des événements du token;
   - la recherche d’un bloc, d’une transaction ou d’une adresse;
-  - l’estimation des frais en ETH, l’envoi de CYD et le formatage des montants.
+  - l’estimation des frais et l’envoi de CYD sur Sepolia (minimum 0,10 CYD) et d’ETH sur Ethereum Mainnet;
+  - le rafraîchissement de l’historique incluant les événements des derniers blocs pour limiter la latence des notifications.
+  - la connexion à MetaMask, la demande de compte, et le changement/ajout de Sepolia ou Mainnet selon l’actif sélectionné.
 
-  Le chain ID configuré est `11155111` (Sepolia). L’adresse et le bloc de déploiement par défaut viennent de `contracts/sepolia-deployment.json`; les variables `VITE_CYD_TOKEN_ADDRESS`, `VITE_CYD_DEPLOYMENT_BLOCK` et `VITE_SEPOLIA_RPC_URL` peuvent fournir des valeurs de remplacement.
+  CYD utilise le chain ID `11155111` (Sepolia); ETH utilise le chain ID `1` (Ethereum Mainnet). L’adresse et le bloc de déploiement CYD viennent de `contracts/sepolia-deployment.json`; les variables `VITE_CYD_TOKEN_ADDRESS`, `VITE_CYD_DEPLOYMENT_BLOCK`, `VITE_SEPOLIA_RPC_URL` et `VITE_ETHEREUM_MAINNET_RPC_URL` peuvent fournir des valeurs de remplacement. Les opérations ETH Mainnet sont réelles et irréversibles.
 
 - `src/shared/blockscout.js` — client HTTP pour l’API Blockscout Sepolia. Il parcourt les pages de journaux du contrat et ne conserve que les événements `Transfer` correspondant au sujet demandé. Il signale les erreurs HTTP, les réponses mal formées et les curseurs répétés au lieu de présenter ces erreurs comme un historique vide.
 
 - `src/shared/wallet-storage.js` — stockage des keystores chiffrés dans `localStorage`, indexés par adresse. Il supporte plusieurs wallets dans le même profil de navigateur, valide les adresses et les entrées, met à jour un wallet existant sans le dupliquer et migre l’ancien format de stockage `clayde.wallet.keystore` vers `clayde.wallet.keystores`.
 
-- `src/shared/payment-request.js` — construit un lien de paiement vers la DApp avec le destinataire et, facultativement, le montant CYD. Il vérifie le format de l’adresse et refuse un montant invalide, nul ou ayant plus de 18 décimales.
+- `src/shared/payment-request.js` — construit un lien de réception vers la DApp avec le destinataire, l’actif CYD ou ETH et, facultativement, le montant. Il vérifie le format de l’adresse et refuse un montant invalide, nul ou ayant plus de 18 décimales.
+
+- `src/shared/transfer-amount.js` — convertit les montants CYD et ETH en unités exactes `bigint`, applique le minimum de 0,10 CYD et refuse les montants ETH nuls.
+
+- `src/shared/recovery-phrase.js` — normalise une phrase de récupération et accepte les longueurs BIP-39 standards de 12, 15, 18, 21 ou 24 mots; `ethers` vérifie ensuite le checksum BIP-39 et dérive l’adresse.
+
+- `src/shared/wallet-network.js` — change MetaMask vers le réseau demandé (Sepolia pour CYD, Ethereum Mainnet pour ETH), ajoute le réseau s’il est absent et vérifie le chain ID actif avant de poursuivre.
 
 - `src/shared/chain.js` — ancien module d’accès au réseau Besu local, avec le chain ID `20261110`, ses anciennes URL RPC/API et une logique de transferts natifs. **Aucune des trois interfaces actuelles ne l’importe**; la version publiée utilise `sepolia.js`. Le fichier est conservé avec les anciens scripts et ne doit pas être confondu avec la configuration active de Sepolia.
 
@@ -120,7 +129,7 @@ Les trois configurations Vite séparent leurs caches. Cette séparation évite q
 - `contracts/ClaydeToken.sol` — contrat Solidity basé sur `ERC20` d’OpenZeppelin. Il crée le token nommé `Clayde`, symbole `CYD`, et attribue une offre initiale fixe de `1 000 000` CYD au compte qui déploie le contrat. Le contrat ne définit pas de fonction d’émission additionnelle.
 - `contracts/sepolia-deployment.json` — adresse publique du contrat déployé et numéro du bloc de déploiement. Ce fichier n’est pas une clé privée; les interfaces et le workflow GitHub Pages s’en servent pour savoir quel contrat lire.
 
-Le token est un ERC-20 de démonstration déployé sur Sepolia. Les frais de gas sont dus en ETH de test sur Sepolia, pas en CYD. Le réseau et les tokens de test ne constituent pas des actifs réels.
+Le token CYD est un ERC-20 de démonstration déployé sur Sepolia; ses frais sont dus en ETH de test. L’actif ETH de l’application est sur Ethereum Mainnet : les transactions et frais utilisent de vrais ETH.
 
 ## 6. Scripts : `scripts/`
 
@@ -138,9 +147,12 @@ Le token est un ERC-20 de démonstration déployé sur Sepolia. Les frais de gas
 ### Tests automatisés
 
 - `scripts/blockscout-index.test.mjs` — vérifie la pagination Blockscout, le filtrage des événements CYD et le signalement d’une erreur HTTP.
+- `scripts/cyd-amount.test.mjs` — vérifie le montant minimum CYD, les décimales françaises et le rejet d’une précision invalide.
 - `scripts/history-index.test.mjs` — vérifie l’indexation persistante et la pagination des historiques natifs et de wallets sur l’ancien indexeur.
 - `scripts/payment-request.test.mjs` — vérifie la création des liens de paiement ainsi que le rejet des adresses et montants invalides.
+- `scripts/recovery-phrase.test.mjs` — vérifie la normalisation et les longueurs de phrase BIP-39 acceptées, dont 24 mots.
 - `scripts/render-deploy.test.mjs` — vérifie que le Genesis peut être construit pour un déploiement hébergé à un validateur sans modifier le paramétrage local QBFT à quatre validateurs.
+- `scripts/wallet-network.test.mjs` — vérifie le basculement MetaMask Mainnet/Sepolia, l’ajout de Sepolia et le signalement d’un changement réseau refusé.
 - `scripts/wallet-storage.test.mjs` — vérifie la migration de l’ancien stockage, la coexistence de plusieurs wallets, la mise à jour sans doublon et l’erreur explicite quand les données enregistrées sont mal formées.
 
 `npm test` exécute ces tests avec le test runner intégré à Node.js (`node --test`). Ce sont des tests de modules et de comportements ciblés, pas un test end-to-end automatisé de chaque clic de l’interface.
@@ -178,6 +190,7 @@ Les clés, fichiers Genesis générés et bases de données Besu restent dans `.
 - `VITE_CHAIN_RPC_URL`, `VITE_HISTORY_API_URL` — anciennes URL RPC et API d’historique locales pour la voie Besu.
 - `VITE_BLOCKCHAIN_URL`, `VITE_EXPLORER_URL`, `VITE_DAPP_URL` — anciennes URL locales des trois interfaces.
 - `VITE_SEPOLIA_RPC_URL` — RPC utilisé par les interfaces Sepolia; le workflow Pages fournit une valeur RPC publique lors du build.
+- `VITE_ETHEREUM_MAINNET_RPC_URL` — RPC Mainnet pour lire les soldes ETH et diffuser les transferts natifs; valeur publique par défaut `https://ethereum-rpc.publicnode.com`.
 - `VITE_CYD_TOKEN_ADDRESS`, `VITE_CYD_DEPLOYMENT_BLOCK` — valeurs de remplacement possibles pour le contrat et son bloc. À défaut, l’application lit `contracts/sepolia-deployment.json`.
 
 Toute variable `VITE_*` utilisée dans une application web peut être intégrée au JavaScript livré au navigateur et donc visible publiquement. On ne doit jamais y mettre une clé privée, un mot de passe, une phrase de récupération ou un secret d’API.
@@ -218,6 +231,7 @@ Le workflow compile chaque application avec son propre chemin de base; cela perm
 | `@vitejs/plugin-react` | Permet à Vite de traiter et compiler le code React/JSX. |
 | `vite` | Serveur de développement et outil de compilation des trois interfaces. |
 | `ethers` | Bibliothèque Ethereum : RPC, adresses, wallets, keystores, contrats, ABI, soldes et transactions. |
+| `qrcode` | Génère dans le navigateur l’image du QR menant à l’écran d’envoi CYD avec le destinataire prérempli. |
 | `react-icons` | Fournit les icônes de navigation et d’actions importées par les composants React. Les icônes sont rendues en composants SVG; le projet n’a pas besoin d’un dossier de photos pour ces icônes. |
 | `@openzeppelin/contracts` | Implémentation standard et réutilisée du contrat ERC-20 importée par `ClaydeToken.sol`. |
 | `solc` | Compilateur Solidity utilisé par `scripts/deploy-cyd.mjs`. |

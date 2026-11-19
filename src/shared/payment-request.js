@@ -1,10 +1,13 @@
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const AMOUNT_PATTERN = /^\d+([.,]\d{1,18})?$/;
 
-export function createCydPaymentUrl(dappUrl, recipient, amount = '', origin) {
+export function createCydPaymentUrl(dappUrl, recipient, amount = '', origin, asset = 'CYD') {
   const address = recipient.trim();
   if (!ADDRESS_PATTERN.test(address)) {
     throw new Error('Une adresse Ethereum valide est requise pour la demande de paiement.');
+  }
+  if (!['CYD', 'ETH'].includes(asset)) {
+    throw new Error('L’actif demandé n’est pas pris en charge.');
   }
 
   const normalizedAmount = amount.trim().replace(',', '.');
@@ -22,5 +25,6 @@ export function createCydPaymentUrl(dappUrl, recipient, amount = '', origin) {
   url.searchParams.set('to', address);
   if (normalizedAmount) url.searchParams.set('amount', normalizedAmount);
   else url.searchParams.delete('amount');
+  url.searchParams.set('asset', asset);
   return url.toString();
 }
