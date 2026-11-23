@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   calculateIndicativeUsdValue,
   fetchCryptoMarketQuotes,
+  fetchStockMarketQuotes,
   MARKET_CRYPTO_FALLBACK_QUOTES,
+  MARKET_STOCK_CATALOG,
 } from '../src/shared/market-data.js';
 
 function coin(id, overrides = {}) {
@@ -80,4 +82,58 @@ test('keeps the complete asset catalog available without inventing failed live q
   assert.equal(MARKET_CRYPTO_FALLBACK_QUOTES.every(({ priceUsd }) => priceUsd === null), true);
   assert.equal(MARKET_CRYPTO_FALLBACK_QUOTES.every(({ image }) => image === null), true);
   assert.equal(MARKET_CRYPTO_FALLBACK_QUOTES.some(({ walletAsset }) => walletAsset === 'ETH'), true);
+});
+
+test('loads only verified stock quotes from the configured Worker', async () => {
+  let requestUrl;
+  const result = await fetchStockMarketQuotes('https://quotes.example.workers.dev', async (url, options) => {
+    requestUrl = new URL(url);
+    assert.equal(options.headers.Accept, 'application/json');
+    assert.equal(options.credentials, 'omit');
+    return {
+      ok: true,
+      async json() {
+        return {
+          provider: 'Finnhub',
+          quotes: [
+            { symbol: 'MSFT', priceUsd: 400, change24h: 1.25, quoteTimestamp: 1700000000 },
+            { symbol: 'AAPL', priceUsd: 200, change24h: -0.5, quoteTimestamp: 1700000001 },
+            { symbol: 'FAKE', priceUsd: 123, change24h: 10 },
+            { symbol: 'NVDA', priceUsd: null, change24h: 0 },
+          ],
+          unavailableSymbols: ['NVDA', 'SPY', 'QQQ', 'TSLA'],
+        };
+      },
+    };
+  });
+
+  assert.equal(requestUrl.href, 'https://quotes.example.workers.dev/api/stocks');
+  assert.deepEqual(result.quotes.map(({ symbol }) => symbol), ['AAPL', 'MSFT']);
+  assert.equal(result.quotes[1].name, 'Microsoft');
+  assert.equal(result.quotes[1].group, 'stocks');
+  assert.equal(result.quotes[1].priceUsd, 400);
+  assert.equal(result.quotes[1].quoteTimestamp, 1700000000);
+  assert.deepEqual(result.quotes[1].sparkline, []);
+  assert.deepEqual(result.unavailableSymbols, ['NVDA', 'SPY', 'QQQ', 'TSLA']);
+  assert.equal(MARKET_STOCK_CATALOG.some(({ symbol }) => symbol === 'XYZ100'), false);
+});
+
+test('reports missing stock Worker, HTTP failures, and malformed quote data', async () => {
+  await assert.rejects(
+    fetchStockMarketQuotes(''),
+    /Configure le Worker Cloudflare/,
+  );
+  await assert.rejects(
+    fetchStockMarketQuotes('https://quotes.example.workers.dev', async () => ({ ok: false, status: 503 })),
+    /HTTP 503/,
+  );
+  await assert.rejects(
+    fetchStockMarketQuotes('https://quotes.example.workers.dev', async () => ({
+      ok: true,
+      async json() {
+        return { quotes: [], unavailableSymbols: [] };
+      },
+    })),
+    /aucun cours boursier vérifiable/,
+  );
 });

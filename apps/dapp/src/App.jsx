@@ -45,13 +45,12 @@ import {
   unlockBrowserWallet,
 } from '../../../src/shared/sepolia.js';
 import { createCydPaymentUrl } from '../../../src/shared/payment-request.js';
-import { getUnseenIncomingTransfers, summarizeIncomingTransfers } from '../../../src/shared/incoming-transfers.js';
 import {
   calculateIndicativeUsdValue,
   CYD_DEMO_PRICE_USD,
   fetchCryptoMarketQuotes,
+  fetchStockMarketQuotes,
   MARKET_CRYPTO_FALLBACK_QUOTES,
-  MARKET_STOCK_CATALOG,
 } from '../../../src/shared/market-data.js';
 import { mergeTransferHistory } from '../../../src/shared/transfer-history.js';
 import { isValidRecoveryPhraseWordCount } from '../../../src/shared/recovery-phrase.js';
@@ -69,6 +68,9 @@ import {
   parseCydTransferAmount,
   parseEthTransferAmount,
 } from '../../../src/shared/transfer-amount.js';
+
+const STOCK_QUOTES_ENDPOINT = import.meta.env.VITE_STOCK_QUOTES_URL
+  || 'https://clayde-stock-quotes.kwwmelvin.workers.dev';
 
 const ASSET_CATALOG = {
   CYD: {
@@ -124,6 +126,9 @@ function App() {
   const [marketQuotes, setMarketQuotes] = useState(MARKET_CRYPTO_FALLBACK_QUOTES);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState('');
+  const [stockQuotes, setStockQuotes] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockError, setStockError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [receiveUrl, setReceiveUrl] = useState('');
   const [qrCode, setQrCode] = useState('');
@@ -131,6 +136,7 @@ function App() {
   const [buyDialogClosing, setBuyDialogClosing] = useState(false);
   const [aboutDialogOpen, setAboutDialogOpen] = useState(false);
   const [aboutDialogClosing, setAboutDialogClosing] = useState(false);
+  const [isAddingWallet, setIsAddingWallet] = useState(false);
   const [savedWalletAddresses, setSavedWalletAddresses] = useState(getBrowserWalletAddresses);
   const [selectedWalletAddress, setSelectedWalletAddress] = useState(
     () => getBrowserWalletAddresses()[0] || '',
@@ -157,13 +163,10 @@ function App() {
   const walletRouteRef = useRef({ view: initialWalletView, asset: initialAsset });
   const buyDialogTimer = useRef(null);
   const aboutDialogTimer = useRef(null);
-  const historyPrimed = useRef(false);
-  const observedTransactionIds = useRef(new Set());
   const historySourcesAvailable = useRef({ rpc: false, indexer: false });
   const historyIndexerRequest = useRef(null);
   const historyIndexerOffset = useRef(0);
   const accountRef = useRef('');
-  const lastObservedEthBalance = useRef(null);
   const activeAssetRef = useRef(initialAsset);
   const networkSwitchInProgress = useRef(false);
   const sessionRestoreStarted = useRef(false);
@@ -200,6 +203,21 @@ function App() {
     }
   }, []);
 
+  const refreshStockQuotes = useCallback(async () => {
+    setStockLoading(true);
+    try {
+      const result = await fetchStockMarketQuotes(STOCK_QUOTES_ENDPOINT);
+      setStockQuotes(result.quotes);
+      setStockError(result.unavailableSymbols.length
+        ? `Cours temporairement indisponibles pour : ${result.unavailableSymbols.join(', ')}.`
+        : '');
+    } catch (stockFetchError) {
+      setStockError(stockFetchError.message || 'Impossible de charger les cours boursiers.');
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!wallet || !recoveryConfirmed) return undefined;
     void refreshMarketQuotes();
@@ -208,6 +226,16 @@ function App() {
     }, 60_000);
     return () => window.clearInterval(timer);
   }, [wallet, recoveryConfirmed, refreshMarketQuotes]);
+
+  useEffect(() => {
+    if (!wallet || !recoveryConfirmed) return undefined;
+    void refreshStockQuotes();
+    if (!STOCK_QUOTES_ENDPOINT) return undefined;
+    const timer = window.setInterval(() => {
+      void refreshStockQuotes();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [wallet, recoveryConfirmed, refreshStockQuotes]);
 
   useEffect(() => () => {
     window.clearTimeout(navigationTimer.current);
@@ -251,26 +279,6 @@ function App() {
     }, 170);
   }
 
-  const showIncomingCydTransfer = useCallback(async (transfer, address) => {
-    try {
-      const currentBalance = await getCydBalance(address, transfer.blockNumber);
-      if (accountRef.current.toLowerCase() !== address.toLowerCase()
-        || activeAssetRef.current !== 'CYD') return;
-      const formattedBalance = formatCydUnits(currentBalance, 4);
-      setBalance(formattedBalance);
-      setTransactionConfirmation({
-        ...transfer,
-        direction: 'received',
-        balance: formattedBalance,
-      });
-    } catch (balanceError) {
-      if (accountRef.current.toLowerCase() !== address.toLowerCase()
-        || activeAssetRef.current !== 'CYD') return;
-      setError(`Réception confirmée, mais impossible d’actualiser le solde : ${balanceError.message || 'le RPC est momentanément indisponible.'}`);
-      setTransactionConfirmation({ ...transfer, direction: 'received', balance: '' });
-    }
-  }, []);
-
   const refresh = useCallback(async (address = account, asset = selectedAsset) => {
     if (!address || !asset) return;
 
@@ -300,21 +308,6 @@ function App() {
       setHistoryError('');
       const applyHistoryRecords = (records, total) => {
         if (accountRef.current.toLowerCase() !== address.toLowerCase()) return;
-        const recentIncoming = historyPrimed.current && activeAssetRef.current === 'CYD'
-          ? getUnseenIncomingTransfers(records, address, observedTransactionIds.current)
-          : [];
-        for (const record of records) {
-          observedTransactionIds.current.add(`${record.hash}-${record.logIndex}`);
-        }
-        historyPrimed.current = true;
-        if (recentIncoming.length) {
-          const incoming = summarizeIncomingTransfers(recentIncoming);
-          void showIncomingCydTransfer({
-            asset: 'CYD',
-            ...incoming,
-            amount: formatCydUnits(incoming.amount, 18),
-          }, address);
-        }
         setHistory((current) => mergeTransferHistory(current, records));
         setHistoryTotal((current) => Math.max(current, total, records.length));
       };
@@ -367,27 +360,13 @@ function App() {
           && !current.balance
           ? { ...current, balance: formattedBalance }
           : current);
-        if (activeAssetRef.current === 'ETH'
-          && lastObservedEthBalance.current !== null
-          && value > lastObservedEthBalance.current) {
-          setTransactionConfirmation({
-            asset: 'ETH',
-            direction: 'received',
-            amount: formatEthUnits(value - lastObservedEthBalance.current, 18),
-            from: '',
-            hash: '',
-            count: 1,
-            balance: formatEthUnits(value, 18),
-          });
-        }
-        lastObservedEthBalance.current = value;
       }).catch((balanceError) => {
         setEthBalance('');
         throw balanceError;
       }));
     }
     await Promise.all(tasks);
-  }, [account, selectedAsset, showIncomingCydTransfer]);
+  }, [account, selectedAsset]);
 
   useEffect(() => {
     if (sessionRestoreStarted.current) return;
@@ -415,12 +394,9 @@ function App() {
         throw new Error('Le compte actuellement connecté ne correspond pas à cette session.');
       }
 
-      historyPrimed.current = false;
-      observedTransactionIds.current.clear();
       historySourcesAvailable.current = { rpc: false, indexer: false };
       historyIndexerRequest.current = null;
       historyIndexerOffset.current = 0;
-      lastObservedEthBalance.current = null;
       accountRef.current = restoredAddress;
       activeAssetRef.current = session.selectedAsset;
       setWallet(restoredWallet);
@@ -601,13 +577,14 @@ function App() {
     setError('');
     setNotice('');
     try {
-      clearWalletSession(window.sessionStorage);
-      historyPrimed.current = false;
-      observedTransactionIds.current.clear();
-      lastObservedEthBalance.current = null;
-      setTransactionConfirmation(null);
       const connectedWallet = await openWallet();
       const address = connectedWallet.address || await connectedWallet.getAddress();
+      clearWalletSession(window.sessionStorage);
+      setIsAddingWallet(false);
+      historySourcesAvailable.current = { rpc: false, indexer: false };
+      historyIndexerRequest.current = null;
+      historyIndexerOffset.current = 0;
+      setTransactionConfirmation(null);
       setSavedWalletAddresses(getBrowserWalletAddresses());
       setSelectedWalletAddress(address);
       setWallet(connectedWallet);
@@ -820,9 +797,6 @@ function App() {
     setWalletMode('welcome');
     setPhraseCopied(false);
     setNotice('Portefeuille verrouillé dans cette page.');
-    historyPrimed.current = false;
-    observedTransactionIds.current.clear();
-    lastObservedEthBalance.current = null;
     setQrCode('');
     setReceiveUrl('');
     window.clearTimeout(buyDialogTimer.current);
@@ -834,8 +808,39 @@ function App() {
 
   function addWallet() {
     setAboutDialogOpen(false);
-    lockWallet();
+    setSidebarOpen(false);
+    setWalletMode('welcome');
+    setSelectedWalletAddress(savedWalletAddresses[0] || '');
+    setPassword('');
+    setPasswordConfirmation('');
+    setRecoveryInput('');
+    setKeystoreFile('');
+    setError('');
     setNotice('');
+    setIsAddingWallet(true);
+  }
+
+  function cancelAddWallet() {
+    setIsAddingWallet(false);
+    setWalletMode('welcome');
+    setPassword('');
+    setPasswordConfirmation('');
+    setRecoveryInput('');
+    setKeystoreFile('');
+    setError('');
+  }
+
+  function openSavedWallet(address) {
+    if (address.toLowerCase() === account.toLowerCase()) {
+      setSidebarOpen(false);
+      return;
+    }
+    setSelectedWalletAddress(address);
+    setWalletMode('unlock');
+    setPassword('');
+    setError('');
+    setSidebarOpen(false);
+    setIsAddingWallet(true);
   }
 
   function backupWallet() {
@@ -945,7 +950,6 @@ function App() {
           setBalance(formattedBalance);
         } else {
           setEthBalance(formattedBalance);
-          lastObservedEthBalance.current = updatedBalance;
         }
         setTransactionConfirmation({ ...confirmation, balance: formattedBalance });
       } catch (refreshError) {
@@ -1117,6 +1121,31 @@ function App() {
     }
   }
 
+  const displayedWalletAddresses = walletSource === 'metamask'
+    && account
+    && !savedWalletAddresses.some((address) => address.toLowerCase() === account.toLowerCase())
+    ? [account, ...savedWalletAddresses]
+    : savedWalletAddresses;
+  const walletAccessProps = {
+    mode: walletMode,
+    setMode: setWalletMode,
+    password,
+    setPassword,
+    passwordConfirmation,
+    setPasswordConfirmation,
+    recoveryInput,
+    setRecoveryInput,
+    keystoreFile,
+    onFileChange: readKeystoreFile,
+    onSubmit: submitWallet,
+    onConnectMetaMask: connectMetaMask,
+    busy,
+    savedWalletAddresses,
+    selectedWalletAddress,
+    setSelectedWalletAddress,
+    onCancel: isAddingWallet ? cancelAddWallet : undefined,
+  };
+
   return (
     <div className={`wallet-shell ${wallet ? 'wallet-connected-shell' : 'wallet-access-shell'} ${wallet && !selectedAsset && walletView === 'home' ? 'wallet-market-shell' : ''}`}>
       {wallet && sidebarOpen && <button className="wallet-sidebar-backdrop" type="button" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" />}
@@ -1130,6 +1159,22 @@ function App() {
           {wallet && <button className={walletView === 'settings' ? 'active' : ''} onClick={() => { navigateWalletView('settings'); setSidebarOpen(false); }}><FaWallet />Paramètres</button>}
           <button type="button" onClick={addWallet}><FaPlus />Ajouter un portefeuille</button>
         </nav>
+        <div className="wallet-switcher" aria-label="Portefeuilles">
+          <span className="wallet-switcher-heading">Mes portefeuilles</span>
+          {displayedWalletAddresses.map((address) => (
+            <button
+              className={address.toLowerCase() === account.toLowerCase() ? 'is-active' : ''}
+              type="button"
+              key={address}
+              onClick={() => openSavedWallet(address)}
+              title={address}
+            >
+              <FaWallet />
+              <span>{shorten(address, 7, 5)}</span>
+              {address.toLowerCase() === account.toLowerCase() && <small>Actif</small>}
+            </button>
+          ))}
+        </div>
         <div className="wallet-sidebar-footer">
           <span className="wallet-network"><span className={wallet ? 'online-dot' : 'offline-dot'} />
             {selectedAsset === 'ETH' ? 'Ethereum Mainnet' : selectedAsset === 'CYD' ? 'Ethereum Sepolia · CYD' : 'Réseau selon l’actif'}
@@ -1160,23 +1205,11 @@ function App() {
         {!wallet && sessionRestoring && <div className="session-restoring" role="status">Restauration de votre session dans cet onglet…</div>}
         {!wallet && !sessionRestoring && <WalletAccess
           key={walletMode}
-          mode={walletMode}
-          setMode={setWalletMode}
-          password={password}
-          setPassword={setPassword}
-          passwordConfirmation={passwordConfirmation}
-          setPasswordConfirmation={setPasswordConfirmation}
-          recoveryInput={recoveryInput}
-          setRecoveryInput={setRecoveryInput}
-          keystoreFile={keystoreFile}
-          onFileChange={readKeystoreFile}
-          onSubmit={submitWallet}
-          onConnectMetaMask={connectMetaMask}
-          busy={busy}
-          savedWalletAddresses={savedWalletAddresses}
-          selectedWalletAddress={selectedWalletAddress}
-          setSelectedWalletAddress={setSelectedWalletAddress}
+          {...walletAccessProps}
         />}
+        {wallet && isAddingWallet && <div className="wallet-add-overlay" role="dialog" aria-modal="true" aria-label="Ajouter ou ouvrir un portefeuille">
+          <WalletAccess key={`add-${walletMode}`} {...walletAccessProps} />
+        </div>}
 
         {wallet && recoveryPhrase && !recoveryConfirmed && <RecoveryPhraseDialog
           phrase={recoveryPhrase}
@@ -1193,9 +1226,13 @@ function App() {
           {!selectedAsset
             ? <MarketExplorer
               quotes={marketQuotes}
+              stockQuotes={stockQuotes}
               loading={marketLoading}
               error={marketError}
+              stockLoading={stockLoading}
+              stockError={stockError}
               onRetry={refreshMarketQuotes}
+              onRetryStocks={refreshStockQuotes}
               onSelectAsset={chooseAsset}
             />
             : <>
@@ -1275,9 +1312,13 @@ function App() {
               <MarketExplorer
                 compact
                 quotes={marketQuotes}
+                stockQuotes={stockQuotes}
                 loading={marketLoading}
                 error={marketError}
+                stockLoading={stockLoading}
+                stockError={stockError}
                 onRetry={refreshMarketQuotes}
+                onRetryStocks={refreshStockQuotes}
                 onSelectAsset={chooseAsset}
                 selectedAsset={selectedAsset}
               />
@@ -1385,7 +1426,7 @@ function App() {
             </section>
             <section>
               <h3>Politique de confidentialité — résumé</h3>
-              <p>L’application ne crée pas de compte central et ne vous demande pas votre phrase secrète pour utiliser MetaMask. Pour afficher les soldes et l’historique, votre adresse publique est transmise aux fournisseurs RPC et à l’indexeur utilisés par le réseau ; ces services peuvent recevoir votre adresse IP et les détails techniques des requêtes. Les cours crypto sont demandés à CoinGecko sans transmettre l’adresse du portefeuille. Les transactions inscrites sur une blockchain sont publiques.</p>
+              <p>L’application ne crée pas de compte central et ne vous demande pas votre phrase secrète pour utiliser MetaMask. Pour afficher les soldes et l’historique, votre adresse publique est transmise aux fournisseurs RPC et à l’indexeur utilisés par le réseau ; ces services peuvent recevoir votre adresse IP et les détails techniques des requêtes. Les cours crypto sont demandés à CoinGecko sans transmettre l’adresse du portefeuille. Les symboles boursiers sont transmis à Finnhub par l’intermédiaire du Worker Cloudflare ; ni l’adresse ni le solde du portefeuille ne sont inclus dans cette demande. Les transactions inscrites sur une blockchain sont publiques.</p>
               <p>Pour restaurer un wallet local après actualisation, sa clé déchiffrée est conservée temporairement dans le stockage de session de cet onglet. Elle est effacée lorsque vous verrouillez le wallet ou fermez l’onglet. Évitez les appareils partagés ou non fiables.</p>
               <p>Le portefeuille local chiffré est conservé dans le navigateur : sauvegardez-le et gardez votre phrase de récupération hors ligne. La suppression des données du navigateur peut effacer ce portefeuille. Ne partagez jamais votre phrase secrète ou votre mot de passe.</p>
             </section>
@@ -1439,7 +1480,6 @@ function BackButton({ onClick, className = '', disabled = false }) {
 
 function TransactionConfirmationDialog({ transfer, address, onClose }) {
   const isCyd = transfer.asset === 'CYD';
-  const isOutgoing = transfer.direction === 'sent';
   const explorerUrl = transfer.hash
     ? isCyd
       ? `${CHAIN.explorerUrl}?search=${transfer.hash}`
@@ -1451,7 +1491,7 @@ function TransactionConfirmationDialog({ transfer, address, onClose }) {
   return (
     <div className="incoming-transfer-overlay">
       <section
-        className={`incoming-transfer-dialog ${isOutgoing ? 'is-sent' : 'is-received'}`}
+        className="incoming-transfer-dialog is-sent"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="incoming-transfer-title"
@@ -1460,17 +1500,14 @@ function TransactionConfirmationDialog({ transfer, address, onClose }) {
         <BackButton className="dialog-back-button" onClick={onClose} />
         <span className="incoming-transfer-icon"><FaCheckCircle /></span>
         <p className="incoming-transfer-kicker">TRANSACTION CONFIRMÉE</p>
-        <h2 id="incoming-transfer-title">{isOutgoing ? 'Votre envoi est confirmé' : 'Vous avez reçu des fonds'}</h2>
+        <h2 id="incoming-transfer-title">Votre envoi est confirmé</h2>
         <strong className="incoming-transfer-amount">
-          {isOutgoing ? '−' : '+'}{transfer.amount} {transfer.asset}
+          −{transfer.amount} {transfer.asset}
         </strong>
-        <p id="incoming-transfer-message">
-          Le transfert est confirmé sur {isCyd ? 'Ethereum Sepolia' : 'Ethereum Mainnet'}.
-          {!isOutgoing && transfer.count > 1 ? ` ${transfer.count} transferts viennent d’être détectés.` : ''}
-        </p>
-        {(isOutgoing ? transfer.to : transfer.from) && (
+        <p id="incoming-transfer-message">Le transfert est confirmé sur {isCyd ? 'Ethereum Sepolia' : 'Ethereum Mainnet'}.</p>
+        {transfer.to && (
           <p className="incoming-transfer-sender">
-            {isOutgoing ? 'Vers' : 'De'} : <span className="mono">{shorten(isOutgoing ? transfer.to : transfer.from, 8, 6)}</span>
+            Vers : <span className="mono">{shorten(transfer.to, 8, 6)}</span>
           </p>
         )}
         {transfer.fee && <p className="incoming-transfer-sender">Frais réseau : {transfer.fee} ETH</p>}
@@ -1691,9 +1728,13 @@ function formatMarketPrice(value) {
 
 function MarketExplorer({
   quotes,
+  stockQuotes,
   loading,
   error,
+  stockLoading,
+  stockError,
   onRetry,
+  onRetryStocks,
   onSelectAsset,
   selectedAsset = '',
   compact = false,
@@ -1708,7 +1749,7 @@ function MarketExplorer({
 
   useEffect(() => {
     const directions = {};
-    for (const quote of quotes) {
+    for (const quote of [...quotes, ...stockQuotes]) {
       if (!Number.isFinite(quote.priceUsd)) continue;
       const previousPrice = previousPrices.current.get(quote.id);
       if (Number.isFinite(previousPrice) && quote.priceUsd !== previousPrice) {
@@ -1721,7 +1762,7 @@ function MarketExplorer({
       window.clearTimeout(animationTimer.current);
       animationTimer.current = window.setTimeout(() => setPriceDirections({}), 1200);
     }
-  }, [quotes]);
+  }, [quotes, stockQuotes]);
 
   useEffect(() => () => window.clearTimeout(animationTimer.current), []);
 
@@ -1831,17 +1872,26 @@ function MarketExplorer({
           </section>
           <p className="market-disclaimer">Cours crypto fournis par CoinGecko, actualisés environ chaque minute. Ils ne représentent pas le solde de votre portefeuille. Pour CYD, 1 000 $ et 1 000 000 CYD sont des valeurs illustratives, pas un cours de marché.</p>
         </>
-        : <MarketSection
-          title="Actions"
-          items={MARKET_STOCK_CATALOG.map((item) => ({ ...item, id: item.symbol, group: 'stocks' }))}
-          expanded={expandedSections.stocks}
-          onToggle={() => toggleExpanded('stocks')}
-          onSelect={setFocusedAsset}
-          selectedAsset={selectedAsset}
-          priceDirections={priceDirections}
-          compact={compact}
-          unavailable
-        />}
+        : <>
+          {stockError && <div className="market-status is-stale" role="status">
+            <span>{stockError}</span>
+            <button type="button" onClick={onRetryStocks} disabled={stockLoading}>
+              {stockLoading ? 'Actualisation…' : 'Réessayer'}
+            </button>
+          </div>}
+          {stockQuotes.length > 0 && <p className="market-category-note">Cours en USD fournis par Finnhub via un Worker sécurisé ; variation depuis la clôture précédente. Actualisation environ chaque minute.</p>}
+          <MarketSection
+            title="Actions"
+            items={stockQuotes}
+            expanded={expandedSections.stocks}
+            onToggle={() => toggleExpanded('stocks')}
+            onSelect={setFocusedAsset}
+            selectedAsset={selectedAsset}
+            priceDirections={priceDirections}
+            loading={stockLoading}
+            compact={compact}
+          />
+        </>}
 
       {focusedAsset && <MarketAssetDialog
         asset={focusedAsset}
@@ -1862,7 +1912,6 @@ function MarketSection({
   loading,
   compact,
   popular = false,
-  unavailable = false,
 }) {
   const limit = popular ? 2 : 4;
   const shown = expanded ? items : items.slice(0, limit);
@@ -1874,7 +1923,6 @@ function MarketSection({
           {expanded ? 'Réduire' : 'Afficher tous'} <FaChevronRight />
         </button>}
       </div>
-      {unavailable && <p className="market-category-note">Les cours d’actions ne sont pas fournis par la source crypto connectée. Aucun prix n’est estimé ni inventé.</p>}
       {!items.length && loading
         ? <div className="market-loading compact-loading" role="status">Chargement…</div>
         : <div className={popular ? 'market-popular-list' : 'market-asset-list'}>
@@ -1884,7 +1932,6 @@ function MarketSection({
               asset={item}
               selected={item.walletAsset === selectedAsset}
               direction={priceDirections[item.id] || ''}
-              unavailable={unavailable}
               onClick={() => onSelect(item)}
             />
           ))}
@@ -1893,7 +1940,7 @@ function MarketSection({
   );
 }
 
-function MarketAssetRow({ asset, selected, direction, unavailable, onClick }) {
+function MarketAssetRow({ asset, selected, direction, onClick }) {
   const hasQuote = Number.isFinite(asset.priceUsd);
   const subtitle = asset.marketStatus
     || (Number.isFinite(asset.volume24hUsd) ? `Vol. ${formatCompactUsd(asset.volume24hUsd)}` : asset.name);
@@ -1908,14 +1955,14 @@ function MarketAssetRow({ asset, selected, direction, unavailable, onClick }) {
       </span>
       {hasQuote
         ? <MarketSparkline asset={asset} />
-        : <span className="market-no-quote">{unavailable ? 'Cours indisponible' : asset.marketStatus || 'Cours indisponible'}</span>}
+        : <span className="market-no-quote">{asset.marketStatus || 'Cours indisponible'}</span>}
       <span className="market-asset-value">
         <strong>{hasQuote ? formatMarketPrice(asset.priceUsd) : '—'}</strong>
         <small className={asset.change24h === null || asset.change24h === undefined
           ? ''
           : asset.change24h >= 0 ? 'is-positive' : 'is-negative'}>
           {asset.change24h === null || asset.change24h === undefined
-            ? unavailable ? 'Données non connectées' : asset.walletAsset === 'CYD' ? 'Testnet' : hasQuote ? '—' : 'Cours indisponible'
+            ? asset.walletAsset === 'CYD' ? 'Testnet' : hasQuote ? '—' : 'Cours indisponible'
             : `${asset.change24h > 0 ? '+' : ''}${asset.change24h.toFixed(2)}%`}
         </small>
       </span>
@@ -1962,11 +2009,11 @@ function MarketAssetDialog({ asset, onClose }) {
             <p className={asset.isDemonstration ? 'market-demo-note' : asset.change24h >= 0 ? 'is-positive' : 'is-negative'}>
               {asset.isDemonstration
                 ? 'Valeur de démonstration ; aucune cotation réelle.'
-                : asset.change24h === null ? 'Variation 24 h indisponible' : `${asset.change24h > 0 ? '+' : ''}${asset.change24h.toFixed(2)}% sur 24 h`}
+                : asset.group === 'stocks'
+                  ? `Variation depuis la clôture précédente : ${asset.change24h === null ? 'indisponible' : `${asset.change24h > 0 ? '+' : ''}${asset.change24h.toFixed(2)}%`}`
+                  : asset.change24h === null ? 'Variation 24 h indisponible' : `${asset.change24h > 0 ? '+' : ''}${asset.change24h.toFixed(2)}% sur 24 h`}
             </p></>
-          : <p>{asset.group === 'stocks'
-            ? 'Aucun fournisseur de cours d’actions n’est configuré ; les cours ne sont pas affichés.'
-            : 'Aucune donnée de cours n’est disponible pour cet actif.'}</p>}
+          : <p>Aucune donnée de cours n’est disponible pour cet actif.</p>}
         <p className="market-detail-warning">
           {supported
             ? 'Cet actif est pris en charge par le portefeuille. Les transactions sont limitées à son réseau configuré.'
@@ -1995,6 +2042,7 @@ function WalletAccess({
   savedWalletAddresses,
   selectedWalletAddress,
   setSelectedWalletAddress,
+  onCancel,
 }) {
   const wordCount = recoveryInput.trim() ? recoveryInput.trim().split(/\s+/).length : 0;
   const validWordCount = isValidRecoveryPhraseWordCount(wordCount);
@@ -2004,6 +2052,7 @@ function WalletAccess({
   if (mode === 'welcome') {
     return (
       <section className="welcome-card" aria-labelledby="welcome-title">
+        {onCancel && <button className="access-back" type="button" onClick={onCancel} aria-label="Retour au portefeuille actif"><FaArrowLeft /></button>}
         <div className="welcome-brand-animation" aria-hidden="true">
           <span className="welcome-brand-orbit" />
           <span className="brand-mark welcome-brand-mark">C</span>

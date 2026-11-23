@@ -12,7 +12,7 @@
     "dev:besu": "node scripts/dev.mjs",
     "token:deploy": "node scripts/deploy-cyd.mjs",
     "build:vercel": "node scripts/build-vercel.mjs",
-    "test": "node --test scripts/routescan-index.test.mjs scripts/cyd-amount.test.mjs scripts/history-index.test.mjs scripts/incoming-transfers.test.mjs scripts/market-data.test.mjs scripts/payment-request.test.mjs scripts/recovery-phrase.test.mjs scripts/render-deploy.test.mjs scripts/rpc-log-range.test.mjs scripts/transfer-history.test.mjs scripts/wallet-network.test.mjs scripts/wallet-password.test.mjs scripts/wallet-session.test.mjs scripts/wallet-storage.test.mjs",
+    "test": "node --test scripts/routescan-index.test.mjs scripts/cyd-amount.test.mjs scripts/history-index.test.mjs scripts/incoming-transfers.test.mjs scripts/market-data.test.mjs scripts/stock-quotes-worker.test.mjs scripts/payment-request.test.mjs scripts/recovery-phrase.test.mjs scripts/render-deploy.test.mjs scripts/rpc-log-range.test.mjs scripts/transfer-history.test.mjs scripts/wallet-network.test.mjs scripts/wallet-password.test.mjs scripts/wallet-session.test.mjs scripts/wallet-storage.test.mjs",
     "wallet:create": "node scripts/wallet-create.mjs",
     "network:setup": "node network/besu/setup.js",
     "network:up": "docker compose --project-directory . --env-file .besu/generated/compose.env -f network/besu/compose.yaml up -d",

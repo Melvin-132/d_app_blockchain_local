@@ -1,0 +1,6 @@
+name = "clayde-stock-quotes"
+main = "src/index.js"
+compatibility_date = "2026-03-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://melvin-132.github.io,http://127.0.0.1:5175,http://localhost:5175"

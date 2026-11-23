@@ -123,10 +123,37 @@ pas les anciens soldes CYD de Besu et ne crée aucun pont entre les deux réseau
    interfaces à chaque mise à jour de `main`. Pour que Pages reste gratuit sur GitHub
    Free, le dépôt doit être public; aucun secret de portefeuille n’est requis dans le
    dépôt.
-5. Publiez le fichier de configuration et les changements du projet sur la branche
+5. Pour activer les cours d’actions, créez un compte Finnhub et obtenez une clé API.
+   Ne placez jamais cette clé dans le code ou dans une variable `VITE_*`. Depuis la
+   racine du projet, ouvrez le dossier du Worker puis connectez Wrangler à votre compte
+   Cloudflare :
+
+   ```powershell
+   Set-Location .\cloudflare\stock-quotes
+   npx wrangler login
+   npx wrangler deploy
+   npx wrangler secret put FINNHUB_API_KEY
+   npx wrangler deploy
+   ```
+
+   Le premier déploiement crée le Worker; `secret put` demande ensuite la clé dans le
+   terminal. Elle est enregistrée chez Cloudflare et n’est pas incluse dans le dépôt.
+   Le dernier déploiement l’active. Le Worker autorise le domaine GitHub Pages du projet
+   et les deux origines locales Vite, et ne relaie que les six symboles de son catalogue.
+6. L’adresse de ce Worker est déjà la valeur par défaut de la DApp. Il n’est donc pas
+   nécessaire d’avoir accès aux paramètres Actions du dépôt GitHub. Si vous déployez un
+   autre Worker, vous pouvez remplacer cette adresse par `VITE_STOCK_QUOTES_URL` dans
+   `.env` en local ou par la variable Actions `STOCK_QUOTES_URL` pour GitHub Pages.
+7. Publiez les changements du projet sur la branche
    `main`. Après la réussite de l’action, ouvre
    <https://melvin-132.github.io/d_app_blockchain_local/>. Les pages sont aussi
    disponibles sous `/blockchain/`, `/explorer/` et `/dapp/`.
+
+GitHub Pages et Cloudflare exécutent les deux parties en ligne : les cours restent
+accessibles quand votre ordinateur est éteint. Il faut toutefois déployer le Worker et y
+enregistrer la clé Finnhub avant que les cours s’affichent. Les cours d’actions sont
+servis par Finnhub via le Worker et leur disponibilité, délai et quotas dépendent du
+fournisseur.
 
 Le wallet est déchiffré en mémoire pendant son utilisation; seul le keystore chiffré
 est conservé dans le stockage local du navigateur. Le tableau de bord lit les blocs

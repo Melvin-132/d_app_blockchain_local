@@ -33,6 +33,7 @@ jobs:
       - name: Build all interfaces
         env:
           VITE_SEPOLIA_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
+          VITE_STOCK_QUOTES_URL: ${{ vars.STOCK_QUOTES_URL }}
         run: |
           mkdir -p _site/blockchain _site/explorer _site/dapp
           VITE_BASE_PATH="/${GITHUB_REPOSITORY#*/}/blockchain/" npm run build:blockchain

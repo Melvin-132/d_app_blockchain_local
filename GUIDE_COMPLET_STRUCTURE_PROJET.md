@@ -38,6 +38,7 @@ d_app_blockchain_local/
 │   ├── explorer/                   # Explorateur
 │   └── dapp/                       # Portefeuille DApp et assets statiques
 ├── contracts/                      # Contrat CYD et configuration de déploiement
+├── cloudflare/stock-quotes/         # Proxy Cloudflare des cours boursiers
 ├── network/besu/                   # Configuration de l’ancien réseau local Besu
 ├── scripts/                        # Démarrage, déploiement, serveur historique et tests
 ├── src/shared/                     # Fonctions et styles réutilisés
@@ -106,6 +107,8 @@ Les trois configurations Vite séparent leurs caches. Cette séparation évite q
   CYD utilise le chain ID `11155111` (Sepolia); ETH utilise le chain ID `1` (Ethereum Mainnet). L’adresse et le bloc de déploiement CYD viennent de `contracts/sepolia-deployment.json`; les variables `VITE_CYD_TOKEN_ADDRESS`, `VITE_CYD_DEPLOYMENT_BLOCK`, `VITE_SEPOLIA_RPC_URL` et `VITE_ETHEREUM_MAINNET_RPC_URL` peuvent fournir des valeurs de remplacement. Les opérations ETH Mainnet sont réelles et irréversibles.
 
 - `src/shared/blockscout.js` — client HTTP pour l’API Blockscout Sepolia. Il parcourt les pages de journaux du contrat et ne conserve que les événements `Transfer` correspondant au sujet demandé. Il signale les erreurs HTTP, les réponses mal formées et les curseurs répétés au lieu de présenter ces erreurs comme un historique vide.
+
+- `src/shared/market-data.js` — catalogue crypto/actions et normalisation des cours CoinGecko et du Worker Cloudflare. Il refuse les cours absents ou invalides au lieu d’en fabriquer.
 
 - `src/shared/wallet-storage.js` — stockage des keystores chiffrés dans `localStorage`, indexés par adresse. Il supporte plusieurs wallets dans le même profil de navigateur, valide les adresses et les entrées, met à jour un wallet existant sans le dupliquer et migre l’ancien format de stockage `clayde.wallet.keystore` vers `clayde.wallet.keystores`.
 
@@ -180,6 +183,7 @@ Les clés, fichiers Genesis générés et bases de données Besu restent dans `.
 - `.dockerignore` — exclut les dépendances, builds, données privées/locales et fichiers d’environnement du contexte de construction Docker.
 - `.devcontainer/devcontainer.json` — image Node 22 pour Codespaces/devcontainers, fonctionnalité Docker, port 10000 transféré et `npm ci` après création.
 - `.github/workflows/deploy-pages.yml` — workflow GitHub Actions déclenché par un push sur `main` ou manuellement. Il installe Node, vérifie la configuration du contrat, construit les trois interfaces dans `_site/`, puis publie l’artefact avec GitHub Pages.
+- `cloudflare/stock-quotes/src/index.js` et `cloudflare/stock-quotes/wrangler.toml` — Worker Cloudflare limité aux cours de six symboles Finnhub, avec CORS limité au site GitHub Pages et au développement local. La clé `FINNHUB_API_KEY` doit être enregistrée comme secret Wrangler; elle ne doit jamais être mise dans `VITE_*` ou dans le dépôt.
 - `Dockerfile` — construction multi-étape de l’ancien mode conteneurisé : construit les interfaces Vite, récupère Besu puis lance `scripts/render-server.mjs` sous Node. Ce n’est pas le workflow de déploiement GitHub Pages.
 - `render.yaml` — configuration de l’ancien service Docker Render, avec une variable `BESU_GENESIS_ADDRESS`.
 - `vercel.json` — configuration de l’ancien build Vercel : commande `build:vercel`, dossier de sortie `public/` et réécritures vers les trois routes.
@@ -192,6 +196,7 @@ Les clés, fichiers Genesis générés et bases de données Besu restent dans `.
 - `VITE_SEPOLIA_RPC_URL` — RPC utilisé par les interfaces Sepolia; le workflow Pages fournit une valeur RPC publique lors du build.
 - `VITE_ETHEREUM_MAINNET_RPC_URL` — RPC Mainnet pour lire les soldes ETH et diffuser les transferts natifs; valeur publique par défaut `https://ethereum-rpc.publicnode.com`.
 - `VITE_CYD_TOKEN_ADDRESS`, `VITE_CYD_DEPLOYMENT_BLOCK` — valeurs de remplacement possibles pour le contrat et son bloc. À défaut, l’application lit `contracts/sepolia-deployment.json`.
+- `VITE_STOCK_QUOTES_URL` — URL publique du Worker Cloudflare. L’URL du Worker du projet est la valeur par défaut dans la DApp; cette variable et la variable Actions facultative `STOCK_QUOTES_URL` servent seulement à la remplacer. L’URL est publique, mais la clé Finnhub ne l’est pas.
 
 Toute variable `VITE_*` utilisée dans une application web peut être intégrée au JavaScript livré au navigateur et donc visible publiquement. On ne doit jamais y mettre une clé privée, un mot de passe, une phrase de récupération ou un secret d’API.
 

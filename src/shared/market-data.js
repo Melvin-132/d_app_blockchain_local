@@ -31,8 +31,64 @@ export const MARKET_STOCK_CATALOG = [
   { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
   { symbol: 'AAPL', name: 'Apple' },
   { symbol: 'TSLA', name: 'Tesla' },
-  { symbol: 'XYZ100', name: 'Indice XYZ100' },
+  { symbol: 'MSFT', name: 'Microsoft' },
 ];
+
+export async function fetchStockMarketQuotes(endpoint, fetchImpl = fetch) {
+  if (!endpoint) {
+    throw new Error('Configure le Worker Cloudflare dans VITE_STOCK_QUOTES_URL pour afficher les cours des actions.');
+  }
+
+  let url;
+  try {
+    url = new URL('/api/stocks', endpoint);
+  } catch {
+    throw new Error('L’URL du Worker de cours boursiers est invalide.');
+  }
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+    throw new Error('Le Worker de cours boursiers doit utiliser une connexion HTTPS.');
+  }
+
+  const response = await fetchImpl(url.toString(), {
+    headers: { Accept: 'application/json' },
+    credentials: 'omit',
+  });
+  if (!response.ok) {
+    throw new Error(`Le Worker de cours boursiers a répondu avec le statut HTTP ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  if (!payload || !Array.isArray(payload.quotes) || !Array.isArray(payload.unavailableSymbols)) {
+    throw new Error('Le Worker a renvoyé des données de cours boursiers invalides.');
+  }
+
+  const quotesBySymbol = new Map(payload.quotes
+    .filter((quote) => quote && typeof quote.symbol === 'string')
+    .map((quote) => [quote.symbol.toUpperCase(), quote]));
+  const quotes = MARKET_STOCK_CATALOG.flatMap((asset) => {
+    const quote = quotesBySymbol.get(asset.symbol);
+    if (!quote || !Number.isFinite(quote.priceUsd) || quote.priceUsd <= 0) return [];
+    return [{
+      ...asset,
+      id: asset.symbol,
+      group: 'stocks',
+      priceUsd: quote.priceUsd,
+      change24h: Number.isFinite(quote.change24h) ? quote.change24h : null,
+      quoteTimestamp: Number.isSafeInteger(quote.quoteTimestamp) ? quote.quoteTimestamp : null,
+      sparkline: [],
+    }];
+  });
+  if (quotes.length === 0) {
+    throw new Error('Le Worker n’a renvoyé aucun cours boursier vérifiable.');
+  }
+
+  return {
+    quotes,
+    unavailableSymbols: payload.unavailableSymbols.filter(
+      (symbol) => typeof symbol === 'string' && MARKET_STOCK_CATALOG.some((asset) => asset.symbol === symbol),
+    ),
+  };
+}
 
 export function calculateIndicativeUsdValue(balance, unitPriceUsd) {
   if (!Number.isFinite(balance) || balance < 0
