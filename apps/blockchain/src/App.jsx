@@ -62,11 +62,12 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href={CHAIN.blockchainUrl}>
-          <span className="brand-mark">C</span><span>CLAYDE CHAIN<small>Build · Innovate · Grow</small></span>
+      <header className="chain-header">
+        <a className="chain-brand" href={CHAIN.blockchainUrl}>
+          <span className="brand-mark">C</span>
+          <span>CLAYDE<span>CHAIN</span><small>BLOCKCHAIN · SEPOLIA</small></span>
         </a>
-        <nav className="side-nav">
+        <nav className="chain-nav" aria-label="Navigation principale">
           {NAV.map(({ label, icon: Icon, href }) => (
             <a key={label} className={
               (label === 'Vue d’ensemble' && page === 'dashboard')
@@ -75,8 +76,11 @@ function App() {
             } href={href}><Icon />{label}</a>
           ))}
         </nav>
-        <div className="sidebar-bottom"><span className={snapshot ? 'online-dot' : 'offline-dot'} />Réseau : {snapshot ? 'En ligne' : 'Hors ligne'}</div>
-      </aside>
+        <div className={`status-pill ${snapshot ? 'success' : 'error'}`}>
+          <span className={snapshot ? 'online-dot' : 'offline-dot'} />
+          {snapshot ? 'Réseau en ligne' : 'Hors ligne'}
+        </div>
+      </header>
 
       <main className="main-area">
         {page === 'settings' ? (
@@ -124,10 +128,6 @@ function App() {
         <>
         <header className="page-header">
           <div><h1>Réseau Claydecoin</h1><p>Vue d’ensemble et activité récente du token CYD</p></div>
-          <div className={`status-pill ${snapshot ? 'success' : 'error'}`}>
-            <span className={snapshot ? 'online-dot' : 'offline-dot'} />
-            {snapshot ? 'Synchronisé' : 'RPC indisponible'}
-          </div>
         </header>
 
         {error && <div className="error-banner" role="alert">{error}<br />Vérifiez la connexion réseau et la configuration du contrat CYD.</div>}
